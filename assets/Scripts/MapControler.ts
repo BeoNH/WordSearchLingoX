@@ -1,7 +1,8 @@
-import { _decorator, Color, Component, EventTouch, Input, input, instantiate, Label, Node, Prefab, Sprite, UITransform, Vec3, Graphics, tween, v3, assetManager, ImageAsset, SpriteFrame, Texture2D } from 'cc';
+import { _decorator, Color, Component, EventTouch, Input, input, instantiate, Label, Node, Prefab, Sprite, UITransform, Vec3, Graphics, tween, v3, assetManager, ImageAsset, SpriteFrame, Texture2D, Button } from 'cc';
 import { GameManager } from './GameManager';
 import { WordSearch } from './WordSearch';
 import { UIControler } from './UIControler';
+import { AudioController } from './AudioController';
 const { ccclass, property } = _decorator;
 
 
@@ -17,7 +18,7 @@ interface GridCell {
 
 @ccclass('MapControler')
 export class MapControler extends Component {
-    
+
     @property({ readonly: true, editorOnly: true, serializable: false })
     private GRID: string = "========== GRID ELEMENTS ==========";
     @property({ type: Node, tooltip: "Node chứa toàn bộ lưới ô" })
@@ -33,20 +34,23 @@ export class MapControler extends Component {
     public answerList: Node = null;
     @property({ type: Prefab, tooltip: "Node hiển thị đáp án" })
     public answerCell: Prefab = null;
+    @property({ type: Label, tooltip: "Hiện thị số đáp án đúng" })
+    public lbCorrectAnswer: Label = null;
+    @property({ type: Sprite, tooltip: "Ảnh đáp án được phóng to" })
+    public imgZoomScale: Sprite = null;
     // @property({ type: Node, tooltip: "Node chứa các gợi ý từ khoá" })
     // public itemShowKeyList: Node = null;
 
-    
+
     // Game State
     private grid: GridCell[][] = [];
     private selectedCells: GridCell[] = [];
-    private wordAnswers: string[] = [];
-    private discoveredWords: boolean[] = [];
-    private timeInterval: number = null;
     private usedFeatures: UsedFeatures = {
         hints: new Set<number>(),
         sounds: new Set<number>()
     };
+    public wordAnswers: string[] = [];
+    public discoveredWords: boolean[] = [];
 
     // Touch State
     private touchStartRow: number = -1;
@@ -58,7 +62,7 @@ export class MapControler extends Component {
     private _eventListenersInitialized = false;
 
 
-    
+
     initMap() {
         GameManager.getRandomWordSet();
         GameManager.generateMatrix();
@@ -67,7 +71,6 @@ export class MapControler extends Component {
         this.initializeData();
         this.setupUI();
         this.registerEvents();
-        this.startTimer();
     }
 
 
@@ -80,11 +83,6 @@ export class MapControler extends Component {
      * - Reset giao diện
      */
     private resetGameState() {
-        // Xóa timer và sự kiện
-        if (this.timeInterval) {
-            clearInterval(this.timeInterval);
-            this.timeInterval = null;
-        }
         this.unregisterEvents();
 
         // Reset các biến trạng thái
@@ -99,6 +97,7 @@ export class MapControler extends Component {
         this.selectionStep = 0;
         this.activeSelectionLine = null;
         this._eventListenersInitialized = false;
+        this.imgZoomScale.node.parent.active = false;
         WordSearch.Instance.waitMask.active = false;
 
         this.usedFeatures = {
@@ -132,6 +131,7 @@ export class MapControler extends Component {
         this.selectionLines.children.forEach(line => line.active = false);
         this.initializeWordGrid();
         this.initializeAnswerDisplay();
+        this.updateCorrectAnswer();
     }
 
     /**
@@ -150,27 +150,13 @@ export class MapControler extends Component {
     * Hủy đăng ký sự kiện touch
     */
     private unregisterEvents() {
-        input.off(Input.EventType.TOUCH_START, this.onTouchStart, this);
-        input.off(Input.EventType.TOUCH_MOVE, this.onTouchMove, this);
-        input.off(Input.EventType.TOUCH_END, this.onTouchEnd, this);
+        if (this._eventListenersInitialized) {
+            input.off(Input.EventType.TOUCH_START, this.onTouchStart, this);
+            input.off(Input.EventType.TOUCH_MOVE, this.onTouchMove, this);
+            input.off(Input.EventType.TOUCH_END, this.onTouchEnd, this);
+            this._eventListenersInitialized = false;
+        }
     }
-
-    /**
-     * Bắt đầu đếm thời gian
-     */
-    private startTimer() {
-        let remainingTime = WordSearch.Instance.remainingTime;
-        this.timeInterval = setInterval(() => {
-            if (remainingTime > 0) {
-                remainingTime--;
-                WordSearch.Instance.updateTimeDisplay();
-            } else {
-                this.endMap();
-            }
-        }, 1000);
-    }
-
-
 
 
     //=============== KHỞI TẠO GIAO DIỆN ===============//
@@ -238,13 +224,21 @@ export class MapControler extends Component {
             }
             let label = item.getChildByPath(`Label`).getComponent(Label);
             label.string = this.convertToUnderscore(this.wordAnswers[i]);
-            label.color = new Color(255, 255, 255);
+            label.color = new Color(80, 124, 181);
             item.active = true;
 
-            if(i == 0){
-                this.loadSpriteFrameFromUrl(`https://fastly.picsum.photos/id/177/2515/1830.jpg?hmac=G8-2Q3-YPB2TreOK-4ofcmS-z5F6chIA0GHYAe5yzDY`,sf =>{
-                    pool[i].getChildByPath(`BG/Img`).getComponent(Sprite).spriteFrame = sf;
+            let img = pool[i].getChildByPath(`Media/Img`);
+            let sound = pool[i].getChildByPath(`Media/btnSound`);
+            if (i == 0) {
+                this.loadSpriteFrameFromUrl(`https://fastly.picsum.photos/id/177/2515/1830.jpg?hmac=G8-2Q3-YPB2TreOK-4ofcmS-z5F6chIA0GHYAe5yzDY`, sf => {
+                    img.getComponent(Sprite).spriteFrame = sf;
                 })
+                img.off("click");
+                img.on("click", () => this.zoomScaleImage(null, i));
+            } else {
+                img.active = false;
+                sound.off("click");
+                sound.on("click", () => this.onReadLetter(null, i));
             }
         }
 
@@ -441,12 +435,14 @@ export class MapControler extends Component {
             answer.toUpperCase().replace(/\s/g, '')
         );
 
+        let checkWrong = true;
         for (let i = 0; i < formattedAnswers.length; i++) {
             if (this.discoveredWords[i]) continue;
 
             if (formattedAnswers[i] === forwardWord || formattedAnswers[i] === backwardWord) {
                 this.activeSelectionLine.active = true;
-
+                checkWrong = false;
+                
                 this.onReadWord(formattedAnswers[i]);
                 if (!this.usedFeatures.sounds.has(i)) {
                     this.usedFeatures.sounds.add(i);
@@ -454,16 +450,23 @@ export class MapControler extends Component {
                 }
 
                 this.discoveredWords[i] = true;
+                AudioController.Instance.Correct();
                 WordSearch.Instance.updateScoreDisplay(GameManager.bonusScore);
+                this.updateCorrectAnswer();
 
                 this.showWordMoveEffect(this.selectedCells, i, () => {
                     if (this.discoveredWords.every(found => found)) {
+                        AudioController.Instance.Clear();
                         this.endMap();
                     }
                 });
 
                 break;
             }
+        }
+
+        if(checkWrong && this.node.active){
+            AudioController.Instance.timeOver_False();
         }
     }
 
@@ -480,6 +483,14 @@ export class MapControler extends Component {
         }
     }
 
+    /**
+     * Cập nhật số câu hỏi đã trả lời đúng
+     */
+    private updateCorrectAnswer() {
+        const correctCount = this.discoveredWords.filter(found => found).length;
+        const totalCount = this.discoveredWords.length;
+        this.lbCorrectAnswer.string = `Words: ${correctCount}/${totalCount}`;
+    }
 
 
     //=============== XỬ LÝ ITEM HỖI TRỢ ===============//
@@ -515,24 +526,56 @@ export class MapControler extends Component {
         }
     }
 
+    /**
+     * Phóng to ảnh ra
+     */
+    zoomScaleImage(e: EventTouch, indx: number) {
+        // Nếu index không hợp lệ thì ẩn popup và return luôn
+        if (indx === undefined || indx === null) {
+            if (this.imgZoomScale.node.parent) {
+                this.imgZoomScale.node.parent.active = false;
+            }
+            return;
+        }
+
+        // Hiện popup
+        if (this.imgZoomScale.node.parent) {
+            this.imgZoomScale.node.parent.active = true;
+        }
+
+        // Lấy spriteFrame từ answerList
+        this.imgZoomScale.spriteFrame = this.answerList.children[indx].getChildByPath(`Media/Img`).getComponent(Sprite).spriteFrame;
+
+        // Hiệu ứng scale
+        this.imgZoomScale.node.scale = v3(0, 0, 0);
+        tween(this.imgZoomScale.node)
+            .to(0.3, { scale: v3(1, 1, 1) }, { easing: 'backOut' })
+            .call(() => {
+                tween(this.imgZoomScale.node)
+                    .to(0.08, { scale: v3(0.83, 0.83, 1) })
+                    .to(0.08, { scale: v3(1, 1, 1) })
+                    .to(0.08, { scale: v3(0.93, 0.93, 1) })
+                    .to(0.08, { scale: v3(1, 1, 1) })
+                    .start();
+            })
+            .start();
+    }
+
+
+
     //=============== XỬ LÝ KẾT THÚC MAP ===============//
     /**
      * Kết thúc Map chơi
      */
     private endMap(): void {
-        if (this.timeInterval) {
-            clearInterval(this.timeInterval);
-            this.timeInterval = null;
-        }
-
         this.unregisterEvents();
 
         if (this.activeSelectionLine) {
             this.activeSelectionLine.active = false;
         }
 
-        // Hiển thị tất cả đáp án chưa tìm được
         this.showAllAnswers();
+        WordSearch.Instance.endGame();
     }
 
 
@@ -553,12 +596,13 @@ export class MapControler extends Component {
             letterNode.setWorldPosition(cell.node.getWorldPosition());
 
             const letterLabel = letterNode.addComponent(Label);
+            letterLabel.color = new Color(80, 124, 181);
             letterLabel.string = cell.letter;
             letterLabel.fontSize = 60;
             letterLabel.lineHeight = 80;
             letterLabel.isBold = true;
             letterLabel.enableOutline = true;
-            letterLabel.outlineColor = new Color(0, 0, 0);
+            letterLabel.outlineColor = new Color(255, 255, 255);
             letterLabel.enableShadow = true;
             letterLabel.shadowColor = new Color(56, 56, 56);
 
@@ -631,15 +675,16 @@ export class MapControler extends Component {
      * Lấy một dragLine chưa được sử dụng
      */
     private getUnusedSelectionLine(): Node {
-        for (const line of this.selectionLines.children) {
-            if (!line.active) {
-                line.active = true;
-                line.getComponent(UITransform).setContentSize(0, 60);
-                line.angle = 0;
-                return line;
-            }
-        }
-        return null;
+        const unusedLines = this.selectionLines.children.filter(line => !line.active);
+        if (unusedLines.length === 0) return null;
+
+        const randomIndex = Math.floor(Math.random() * unusedLines.length);
+        const line = unusedLines[randomIndex];
+
+        line.active = true;
+        line.getComponent(UITransform).setContentSize(0, 60);
+        line.angle = 0;
+        return line;
     }
 
     /**
@@ -670,7 +715,7 @@ export class MapControler extends Component {
         return output.trim();
     }
 
-    
+
     /**
      * Tải SpriteFrame từ URL
      * @param url Đường dẫn URL của ảnh
@@ -688,7 +733,7 @@ export class MapControler extends Component {
 
             const sf = new SpriteFrame();
             sf.texture = texture;
-            
+
             cb(sf);
         });
     }

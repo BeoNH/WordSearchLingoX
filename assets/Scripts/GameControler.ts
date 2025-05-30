@@ -5,12 +5,13 @@ import { GameManager } from './GameManager';
 import { MenuControler } from './MenuControler';
 import { WordSearch } from './WordSearch';
 import { APIManager } from './APIManager';
+import { AudioController } from './AudioController';
 const { ccclass, property } = _decorator;
 
 
-if (!DEBUG) {
-    console.log = function () { };
-}
+// if (!DEBUG) {
+//     console.log = function () { };
+// }
 
 
 @ccclass('GameControler')
@@ -47,12 +48,14 @@ export class GameControler extends Component {
     }
 
     openMenu() {
+        AudioController.Instance.A_Click();
         this.sceneMenu.active = true;
         this.scenePlay.active = false;
         // this.remainTurn();
     }
 
     async openGame() {
+        AudioController.Instance.A_Click();
         this.sceneMenu.active = false;
         this.scenePlay.active = true;
         WordSearch.Instance.initGame();

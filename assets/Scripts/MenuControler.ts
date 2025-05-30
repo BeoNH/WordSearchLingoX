@@ -1,4 +1,4 @@
-import { _decorator, Component, Label, Node, Sprite, resources, SpriteFrame} from 'cc';
+import { _decorator, Component, Label, Node, Sprite, resources, SpriteFrame, Toggle} from 'cc';
 import { GameManager } from './GameManager';
 const { ccclass, property } = _decorator;
 
@@ -118,6 +118,10 @@ export class MenuControler extends Component {
             this.numLevel = newLevel;
             this.updateLevelDisplay();
         }
+    }
+
+    isTest(toggle: Toggle){
+        GameManager.isCountdownMode = toggle.isChecked;
     }
 }
 

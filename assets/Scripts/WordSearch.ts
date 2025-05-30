@@ -3,6 +3,7 @@ import { GameManager } from './GameManager';
 import { UIControler } from './UIControler';
 import { APIManager } from './APIManager';
 import { MapControler } from './MapControler';
+import { AudioController } from './AudioController';
 const { ccclass, property } = _decorator;
 
 /**
@@ -26,18 +27,23 @@ export class WordSearch extends Component {
     public timeTotalLabel: Label = null;
     @property({ type: Label, tooltip: "Label hiển thị điểm số" })
     public scoreLabel: Label = null;
+    @property({ type: Node, tooltip: "Node chứa mode Time" })
+    public modeTimeUI: Node = null;
+    @property({ type: Node, tooltip: "Node chứa mode Page" })
+    public modePageUI: Node = null;
+    @property({ type: Label, tooltip: "Trang đang hiện thị" })
+    public numPage: Label = null;
     @property({ type: Prefab, tooltip: "Map mẫu để sinh ra các map con" })
     public wordSearchMapPrefab: Prefab = null;
     @property({ type: Node, tooltip: "Màn chờ lúc chạy hiệu ứng" })
     public waitMask: Node = null;
 
-    public isCountdownMode: boolean = true;
-
     private mapNodes: Node[] = [];
     private currentMapIndex: number = 0;
-    private totalTime: number = 0;
-    private totalTimer: any = null;
+    private totalTimer: number = null;
+    private timeInterval: number = null;
 
+    public totalTime: number = 0;
     public remainingTime: number = 0;
     public currentScore: number = 0;
 
@@ -46,12 +52,20 @@ export class WordSearch extends Component {
         WordSearch.Instance = this;
         speechSynthesis.getVoices();
 
-        if (this.timeLabel) this.timeLabel.string = '0s';
+        if (this.timeLabel) this.timeLabel.string = '0';
         if (this.scoreLabel) this.scoreLabel.string = '0';
     }
 
     protected onDisable(): void {
-        if (this.timeLabel) this.timeLabel.string = '0s';
+        if (this.timeInterval) {
+            clearInterval(this.timeInterval);
+            this.timeInterval = null;
+        }
+        if (this.totalTimer) {
+            clearInterval(this.totalTimer);
+            this.totalTimer = null;
+        }
+        if (this.timeLabel) this.timeLabel.string = '0';
         if (this.scoreLabel) this.scoreLabel.string = '0';
     }
 
@@ -64,7 +78,7 @@ export class WordSearch extends Component {
         for (let i = 0; i < GameManager.numMap; i++) {
             const mapNode = instantiate(this.wordSearchMapPrefab);
             mapNode.parent = this.node;
-            mapNode.setSiblingIndex(1);
+            mapNode.setSiblingIndex(0);
             const mapComp = mapNode.getComponent(MapControler);
             mapComp.initMap();
 
@@ -72,37 +86,57 @@ export class WordSearch extends Component {
             this.mapNodes.push(mapNode);
         }
         this.currentMapIndex = 0;
+        this.showMap(0);
 
         // Khởi tạo số liệu ban đầu
+        this.currentScore = 0;
+        this.totalTime = 0;
         this.remainingTime = GameManager.timeLimit;
-        this.currentScore = GameManager.initScore;
-        WordSearch.Instance.updateScoreDisplay(this.currentScore);
-        WordSearch.Instance.updateTimeDisplay();
+        this.updateScoreDisplay(this.currentScore);
+        this.updateTimeDisplay();
 
-        this.startTotalTimer();
+        // Chế độ chơi
+        if (GameManager.isCountdownMode) {
+            this.startTotalTimer();
+            this.startTimer();
+        }
+        this.modeTimeUI.active = GameManager.isCountdownMode;
+        this.modePageUI.active = !GameManager.isCountdownMode;
     }
+
+
 
     //=============== XỬ LÝ LOGIC GAME ===============//
 
-    public startTotalTimer() {
-        if (this.isCountdownMode) {
-            this.totalTime = 0;
-            this.timeTotalLabel.string = '00:00:00';
-            this.totalTimer = setInterval(() => {
-                this.totalTime++;
-                const hours = Math.floor(this.totalTime / 3600);
-                const minutes = Math.floor((this.totalTime % 3600) / 60);
-                const seconds = this.totalTime % 60;
-                this.timeTotalLabel.string = `${hours < 10 ? '0' + hours : hours}:${minutes < 10 ? '0' + minutes : minutes}:${seconds < 10 ? '0' + seconds : seconds}`;
-            }, 1000);
-        }
+    /**
+     * Bắt đầu đếm thời gian Map
+     */
+    private startTimer() {
+        this.remainingTime = GameManager.timeLimit;
+        this.timeInterval = setInterval(() => {
+            if (this.remainingTime > 0) {
+                this.remainingTime--;
+                this.updateTimeDisplay();
+            } else {
+                this.endGame();
+            }
+        }, 1000);
     }
 
-    public stopTotalTimer() {
-        if (this.totalTimer) {
-            clearInterval(this.totalTimer);
-            this.totalTimer = null;
-        }
+
+    /**
+     * Bắt đầu đếm thời gian Tổng
+     */
+    public startTotalTimer() {
+        this.totalTime = 0;
+        this.timeTotalLabel.string = '00:00:00';
+        this.totalTimer = setInterval(() => {
+            this.totalTime++;
+            const hours = Math.floor(this.totalTime / 3600);
+            const minutes = Math.floor((this.totalTime % 3600) / 60);
+            const seconds = this.totalTime % 60;
+            this.timeTotalLabel.string = `${hours < 10 ? '0' + hours : hours}:${minutes < 10 ? '0' + minutes : minutes}:${seconds < 10 ? '0' + seconds : seconds}`;
+        }, 1000);
     }
 
 
@@ -110,7 +144,7 @@ export class WordSearch extends Component {
      * Cập nhật hiển thị thời gian
      */
     public updateTimeDisplay() {
-        this.timeLabel.string = `${this.remainingTime}s`;
+        this.timeLabel.string = `${this.remainingTime}`;
     }
 
     /**
@@ -120,11 +154,25 @@ export class WordSearch extends Component {
         const newScore = this.currentScore + number;
         this.currentScore = newScore >= 0 ? newScore : 0;
         this.scoreLabel.string = `${this.currentScore}`;
-        this.showBonusEffect(number);
+        if (this.currentScore > 0) this.showBonusEffect(number);
+    }
 
-        if (this.currentScore <= 0) {
-            this.endGame();
-        }
+    public getDataGameOver() {
+        return {
+            score: this.currentScore,
+            totalTime: this.totalTime,
+            maps: this.mapNodes.map(map => {
+                const mapComp = map.getComponent(MapControler);
+                if (mapComp) {
+                    return {
+                        wordAnswers: mapComp.wordAnswers,
+                        discoveredWords: mapComp.discoveredWords
+                    };
+                } else {
+                    return null;
+                }
+            }).filter(mapData => mapData !== null)
+        };
     }
 
 
@@ -167,20 +215,28 @@ export class WordSearch extends Component {
 
 
     //=============== XỬ LÝ BUTTON ===============//
-    /**
-    * Thoát game và hiển thị popup xác nhận
-    */
-    public onOutGame(): void {
-        UIControler.instance.onOpen(null, 'out', this.currentScore);
-    }
-
-
     // Chuyển trang
     public showMap(index: number) {
         this.mapNodes.forEach((node, i) => node.active = (i === index));
         this.currentMapIndex = index;
-    }
+        this.numPage.string = `Page: ${index+1}/${this.mapNodes.length}`;
 
+        if (!GameManager.isCountdownMode) {
+            const btnDonePage = this.modePageUI.getChildByPath('btnDonePage');
+            const btnNextPage = this.modePageUI.getChildByPath('btnNextPage');
+            const btnPrevPage = this.modePageUI.getChildByPath('btnPrevPage');
+
+            btnDonePage.active = (index === this.mapNodes.length - 1);
+
+            btnNextPage.getComponent(Sprite).grayscale = (index === this.mapNodes.length - 1);
+            btnPrevPage.getComponent(Sprite).grayscale = (index === 0);
+
+            if (index > 0 && index < this.mapNodes.length - 1) {
+                btnNextPage.getComponent(Sprite).grayscale = false;
+                btnPrevPage.getComponent(Sprite).grayscale = false;
+            }
+        }
+    }
     public nextMap() {
         if (this.currentMapIndex < this.mapNodes.length - 1) {
             this.showMap(this.currentMapIndex + 1);
@@ -191,15 +247,40 @@ export class WordSearch extends Component {
             this.showMap(this.currentMapIndex - 1);
         }
     }
-
+    public onOutGame(): void {
+        AudioController.Instance.A_Click();
+        UIControler.instance.onOpen(null, 'out', this.currentScore);
+    }
 
 
     //=============== XỬ LÝ KẾT THÚC GAME ===============//
     /**
      * Kết thúc game
      */
-    private endGame(): void {
-        this.stopTotalTimer();
-        UIControler.instance.onOpen(null, 'over', this.currentScore);
+    public endGame(): void {
+        if (this.timeInterval) {
+            clearInterval(this.timeInterval);
+            this.timeInterval = null;
+            AudioController.Instance.timeOver_False();
+        }
+
+        if (this.currentMapIndex < this.mapNodes.length - 1) {
+            if(GameManager.isCountdownMode){
+                this.showMap(this.currentMapIndex + 1);
+                this.startTimer();
+            }
+            return;
+        }
+
+
+        if (this.totalTimer) {
+            clearInterval(this.totalTimer);
+            this.totalTimer = null;
+        }
+
+        this.scheduleOnce(()=>{
+            AudioController.Instance.gameWin();
+            UIControler.instance.onOpen(null, 'over');
+        },1)
     }
 }
