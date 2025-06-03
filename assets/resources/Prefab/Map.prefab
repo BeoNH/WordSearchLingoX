@@ -40,7 +40,7 @@
         "__id__": 114
       }
     ],
-    "_active": true,
+    "_active": false,
     "_components": [
       {
         "__id__": 136
@@ -3204,6 +3204,9 @@
     "answerCell": {
       "__uuid__": "73b2c170-7e21-4e4c-9143-7b9bf4b8093f",
       "__expectedType__": "cc.Prefab"
+    },
+    "answerScrollView": {
+      "__id__": 34
     },
     "lbCorrectAnswer": {
       "__id__": 31

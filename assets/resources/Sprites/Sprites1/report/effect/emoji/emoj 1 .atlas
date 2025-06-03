@@ -1,0 +1,167 @@
+
+emoj 1 .png
+size: 1762,699
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+Ellipse 1 copy
+  rotate: false
+  xy: 815, 91
+  size: 95, 65
+  orig: 95, 65
+  offset: 0, 0
+  index: -1
+Layer 1
+  rotate: true
+  xy: 1547, 3
+  size: 343, 213
+  orig: 351, 228
+  offset: 4, 13
+  index: -1
+Layer 6420
+  rotate: true
+  xy: 2, 2
+  size: 695, 697
+  orig: 822, 821
+  offset: 65, 62
+  index: -1
+Layer 6421 copy 4
+  rotate: false
+  xy: 701, 158
+  size: 539, 539
+  orig: 595, 595
+  offset: 28, 28
+  index: -1
+Layer 671 copy 3
+  rotate: false
+  xy: 1242, 348
+  size: 349, 349
+  orig: 355, 355
+  offset: 3, 3
+  index: -1
+Shape 1
+  rotate: false
+  xy: 1593, 349
+  size: 80, 37
+  orig: 82, 39
+  offset: 1, 1
+  index: -1
+Shape 1 copy
+  rotate: false
+  xy: 1675, 354
+  size: 80, 37
+  orig: 82, 39
+  offset: 1, 1
+  index: -1
+Shape 1 copy 2
+  rotate: true
+  xy: 1660, 506
+  size: 36, 12
+  orig: 38, 14
+  offset: 1, 1
+  index: -1
+Shape 1 copy 3
+  rotate: true
+  xy: 1660, 468
+  size: 36, 12
+  orig: 38, 14
+  offset: 1, 1
+  index: -1
+Shape 2
+  rotate: false
+  xy: 1593, 544
+  size: 134, 153
+  orig: 134, 153
+  offset: 0, 0
+  index: -1
+emoji2_1
+  rotate: false
+  xy: 701, 50
+  size: 112, 106
+  orig: 118, 112
+  offset: 3, 3
+  index: -1
+emoji2_2
+  rotate: false
+  xy: 1729, 650
+  size: 29, 47
+  orig: 29, 47
+  offset: 0, 0
+  index: -1
+emoji2_3
+  rotate: false
+  xy: 1242, 43
+  size: 303, 303
+  orig: 360, 360
+  offset: 28, 29
+  index: -1
+emoji2_4
+  rotate: false
+  xy: 912, 95
+  size: 106, 61
+  orig: 106, 61
+  offset: 0, 0
+  index: -1
+sad
+  rotate: true
+  xy: 1623, 448
+  size: 94, 35
+  orig: 94, 35
+  offset: 0, 0
+  index: -1
+sad mouth
+  rotate: false
+  xy: 1020, 104
+  size: 116, 52
+  orig: 116, 52
+  offset: 0, 0
+  index: -1
+tears face
+  rotate: true
+  xy: 1623, 428
+  size: 18, 41
+  orig: 18, 41
+  offset: 0, 0
+  index: -1
+tears_0000_5
+  rotate: false
+  xy: 1593, 388
+  size: 28, 154
+  orig: 28, 154
+  offset: 0, 0
+  index: -1
+tears_0001_4
+  rotate: true
+  xy: 1623, 393
+  size: 28, 117
+  orig: 28, 154
+  offset: 0, 37
+  index: -1
+tears_0002_3
+  rotate: false
+  xy: 1729, 574
+  size: 28, 74
+  orig: 28, 154
+  offset: 0, 80
+  index: -1
+tears_0003_2
+  rotate: false
+  xy: 1138, 119
+  size: 28, 37
+  orig: 28, 154
+  offset: 0, 117
+  index: -1
+tears_0004_1
+  rotate: false
+  xy: 1729, 545
+  size: 28, 27
+  orig: 28, 154
+  offset: 0, 127
+  index: -1
+đâsdasdasdasdasd
+  rotate: true
+  xy: 1675, 423
+  size: 119, 58
+  orig: 119, 58
+  offset: 0, 0
+  index: -1

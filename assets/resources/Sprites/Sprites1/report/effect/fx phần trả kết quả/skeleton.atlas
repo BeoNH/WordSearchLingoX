@@ -1,0 +1,13 @@
+
+skeleton.png
+size: 1694,1036
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+Polygon 1 copy 5
+  rotate: false
+  xy: 2, 2
+  size: 1690, 1032
+  orig: 1690, 1032
+  offset: 0, 0
+  index: -1

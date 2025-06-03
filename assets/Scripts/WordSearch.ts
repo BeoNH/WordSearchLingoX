@@ -42,7 +42,7 @@ export class WordSearch extends Component {
     private currentMapIndex: number = 0;
     private totalTimer: number = null;
     private timeInterval: number = null;
-
+    private isTransitioning: boolean = false;
     public totalTime: number = 0;
     public remainingTime: number = 0;
     public currentScore: number = 0;
@@ -212,14 +212,53 @@ export class WordSearch extends Component {
             .start();
     }
 
+    /**
+     * Hiệu ứng chuyển trang map
+     */
+    private transitionMap(prevNode: Node, nextNode: Node, direction: 'left' | 'right', onComplete: () => void) {
+        const centerPos = v3(0, 0, 0);
+        const leftPos = v3(-1500, 0, 0);
+        const rightPos = v3(1500, 0, 0);
+
+        nextNode.active = true;
+        nextNode.setPosition(direction === 'right' ? rightPos : leftPos);
+
+        tween(prevNode)
+            .to(0.5, { position: direction === 'right' ? leftPos : rightPos })
+            .call(() => {
+                prevNode.active = false;
+            })
+            .start();
+
+        tween(nextNode)
+            .to(0.5, { position: centerPos })
+            .call(() => {
+                onComplete && onComplete();
+            })
+            .start();
+    }
+
 
 
     //=============== XỬ LÝ BUTTON ===============//
     // Chuyển trang
     public showMap(index: number) {
-        this.mapNodes.forEach((node, i) => node.active = (i === index));
-        this.currentMapIndex = index;
-        this.numPage.string = `Page: ${index+1}/${this.mapNodes.length}`;
+        if (this.isTransitioning) return;
+        const prevIndex = this.currentMapIndex;
+        const nextIndex = index;
+        this.numPage.string = `Page: ${nextIndex+1}/${this.mapNodes.length}`;
+        
+        if (prevIndex === nextIndex) return;
+        
+        this.isTransitioning = true;
+        const prevNode = this.mapNodes[prevIndex];
+        const nextNode = this.mapNodes[nextIndex];
+        const direction = nextIndex > prevIndex ? 'right' : 'left';
+        
+        this.transitionMap(prevNode, nextNode, direction, () => {
+            this.currentMapIndex = nextIndex;
+            this.isTransitioning = false;
+        });
 
         if (!GameManager.isCountdownMode) {
             const btnDonePage = this.modePageUI.getChildByPath('btnDonePage');
@@ -264,9 +303,10 @@ export class WordSearch extends Component {
             AudioController.Instance.timeOver_False();
         }
 
+
         if (this.currentMapIndex < this.mapNodes.length - 1) {
-            if(GameManager.isCountdownMode){
-                this.showMap(this.currentMapIndex + 1);
+            this.showMap(this.currentMapIndex + 1);
+            if (GameManager.isCountdownMode) {
                 this.startTimer();
             }
             return;
@@ -278,9 +318,9 @@ export class WordSearch extends Component {
             this.totalTimer = null;
         }
 
-        this.scheduleOnce(()=>{
+        this.scheduleOnce(() => {
             AudioController.Instance.gameWin();
             UIControler.instance.onOpen(null, 'over');
-        },1)
+        }, 1)
     }
 }

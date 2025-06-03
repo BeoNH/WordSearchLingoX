@@ -194,7 +194,7 @@ export class GameManager extends Component {
             for (let i = 0; i < word.length; i++) {
                 matrix[row + i * dr][col + i * dc] = word[i];
             }
-            console.log(`Đặt từ ${word} theo hướng [${dr},${dc}]`);
+            console.log(`Đặt từ ${word} theo hướng [${col},${row}]`);
         };
 
         // Các hướng có thể đặt từ (ngang, dọc, chéo)

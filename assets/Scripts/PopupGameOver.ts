@@ -110,6 +110,7 @@ export class PopupGameOver extends Component {
             UITr.height = 0;
         }
     }
+    
 
     check() {
         // const maxValue = Number(Play.instance.point.toFixed(2));

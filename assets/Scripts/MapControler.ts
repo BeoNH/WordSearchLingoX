@@ -1,4 +1,4 @@
-import { _decorator, Color, Component, EventTouch, Input, input, instantiate, Label, Node, Prefab, Sprite, UITransform, Vec3, Graphics, tween, v3, assetManager, ImageAsset, SpriteFrame, Texture2D, Button } from 'cc';
+import { _decorator, Color, Component, EventTouch, Input, input, instantiate, Label, Node, Prefab, Sprite, UITransform, Vec3, Graphics, tween, v3, assetManager, ImageAsset, SpriteFrame, Texture2D, Button, ScrollView, Vec2 } from 'cc';
 import { GameManager } from './GameManager';
 import { WordSearch } from './WordSearch';
 import { UIControler } from './UIControler';
@@ -34,6 +34,8 @@ export class MapControler extends Component {
     public answerList: Node = null;
     @property({ type: Prefab, tooltip: "Node hiển thị đáp án" })
     public answerCell: Prefab = null;
+    @property({ type: Node, tooltip: "ScrollView câu trả lời" })
+    public answerScrollView: Node = null;
     @property({ type: Label, tooltip: "Hiện thị số đáp án đúng" })
     public lbCorrectAnswer: Label = null;
     @property({ type: Sprite, tooltip: "Ảnh đáp án được phóng to" })
@@ -60,6 +62,7 @@ export class MapControler extends Component {
     private selectionStep = 0;
     private activeSelectionLine: Node = null;
     private _eventListenersInitialized = false;
+    private timeEffect = 0.3;
 
 
 
@@ -70,7 +73,16 @@ export class MapControler extends Component {
         this.resetGameState();
         this.initializeData();
         this.setupUI();
+    }
+
+    protected onEnable(): void {
+        console.log("onEnable", this.node.active);
         this.registerEvents();
+    }
+
+    protected onDisable(): void {
+        console.log("onDisable", this.node.active);
+        this.unregisterEvents();
     }
 
 
@@ -442,7 +454,7 @@ export class MapControler extends Component {
             if (formattedAnswers[i] === forwardWord || formattedAnswers[i] === backwardWord) {
                 this.activeSelectionLine.active = true;
                 checkWrong = false;
-                
+
                 this.onReadWord(formattedAnswers[i]);
                 if (!this.usedFeatures.sounds.has(i)) {
                     this.usedFeatures.sounds.add(i);
@@ -454,6 +466,7 @@ export class MapControler extends Component {
                 WordSearch.Instance.updateScoreDisplay(GameManager.bonusScore);
                 this.updateCorrectAnswer();
 
+                this.scrollAnswerToCenter(i);
                 this.showWordMoveEffect(this.selectedCells, i, () => {
                     if (this.discoveredWords.every(found => found)) {
                         AudioController.Instance.Clear();
@@ -465,7 +478,8 @@ export class MapControler extends Component {
             }
         }
 
-        if(checkWrong && this.node.active){
+        console.log(checkWrong);
+        if (checkWrong && this.node.active) {
             AudioController.Instance.timeOver_False();
         }
     }
@@ -586,53 +600,78 @@ export class MapControler extends Component {
     private showWordMoveEffect(selectedCells: GridCell[], answerIndex: number, cb: Function): void {
         const answerNode = this.answerList.children[answerIndex];
         const answerLabel = answerNode.getChildByPath('Label').getComponent(Label);
-        const targetPos = answerLabel.node.getWorldPosition();
-
         WordSearch.Instance.waitMask.active = true;
 
-        selectedCells.forEach((cell, index) => {
-            const letterNode = new Node("MovingLetter");
-            letterNode.parent = this.node;
-            letterNode.setWorldPosition(cell.node.getWorldPosition());
+        this.scheduleOnce(() => {
+            const targetPos = answerLabel.node.getWorldPosition();
+            selectedCells.forEach((cell, index) => {
+                const letterNode = new Node("MovingLetter");
+                letterNode.parent = this.node;
+                letterNode.setWorldPosition(cell.node.getWorldPosition());
 
-            const letterLabel = letterNode.addComponent(Label);
-            letterLabel.color = new Color(80, 124, 181);
-            letterLabel.string = cell.letter;
-            letterLabel.fontSize = 60;
-            letterLabel.lineHeight = 80;
-            letterLabel.isBold = true;
-            letterLabel.enableOutline = true;
-            letterLabel.outlineColor = new Color(255, 255, 255);
-            letterLabel.enableShadow = true;
-            letterLabel.shadowColor = new Color(56, 56, 56);
+                const letterLabel = letterNode.addComponent(Label);
+                letterLabel.color = new Color(80, 124, 181);
+                letterLabel.string = cell.letter;
+                letterLabel.fontSize = 60;
+                letterLabel.lineHeight = 80;
+                letterLabel.isBold = true;
+                letterLabel.enableOutline = true;
+                letterLabel.outlineColor = new Color(255, 255, 255);
+                letterLabel.enableShadow = true;
+                letterLabel.shadowColor = new Color(56, 56, 56);
 
-            const targetX = targetPos.x + (index - selectedCells.length / 2) * 45;
-            const targetY = targetPos.y;
+                const targetX = targetPos.x + (index - selectedCells.length / 2) * 45;
+                const targetY = targetPos.y;
 
-            tween(letterNode)
-                .delay(index * 0.1)
-                .to(0.5, {
-                    worldPosition: new Vec3(targetX, targetY, 0),
-                    scale: new Vec3(1.2, 1.2, 1.2)
-                })
-                .to(0.2, {
-                    scale: new Vec3(1, 1, 1)
-                })
-                .call(() => {
-                    if (index === selectedCells.length - 1) {
-                        answerLabel.string = this.wordAnswers[answerIndex];
-                        this.node.children.forEach(child => {
-                            if (child.name === "MovingLetter") {
-                                child.destroy();
-                            }
-                        });
+                tween(letterNode)
+                    .delay(index * 0.1)
+                    .to(0.5, {
+                        worldPosition: new Vec3(targetX, targetY, 0),
+                        scale: new Vec3(1.2, 1.2, 1.2)
+                    })
+                    .to(0.2, {
+                        scale: new Vec3(1, 1, 1)
+                    })
+                    .call(() => {
+                        if (index === selectedCells.length - 1) {
+                            answerLabel.string = this.wordAnswers[answerIndex];
+                            this.node.children.forEach(child => {
+                                if (child.name === "MovingLetter") {
+                                    child.destroy();
+                                }
+                            });
 
-                        WordSearch.Instance.waitMask.active = false;
-                        cb();
-                    }
-                })
-                .start();
-        });
+                            WordSearch.Instance.waitMask.active = false;
+                            cb();
+                        }
+                    })
+                    .start();
+            });
+        }, this.timeEffect);
+    }
+
+    /**
+     * HIệu ứng Scroll đáp án về giữa
+     */
+    private scrollAnswerToCenter(index: number) {
+        if (!this.answerScrollView) return;
+
+        const item = this.answerList.children[index];
+        if (!item) return;
+
+        const itemWidth = item.getComponent(UITransform).width;
+        const itemWidthIdx = itemWidth * index;
+        const viewWidth = this.answerScrollView.getComponent(UITransform).width;
+        const contentWidth = this.answerList.getComponent(UITransform).width;
+
+        let offset = viewWidth / 2 + itemWidthIdx;
+        offset = Math.max(0, Math.min(offset, contentWidth - viewWidth / 2));
+        console.log(viewWidth / 2, itemWidthIdx, offset);
+
+        const content = this.answerScrollView.getComponent(ScrollView).content;
+        tween(content)
+            .to(this.timeEffect, { position: new Vec3(-offset, 0, 0) }, { easing: 'backOut' })
+            .start();
     }
 
 
