@@ -6,11 +6,20 @@ const { ccclass, property } = _decorator;
 export class GameManager extends Component {
 
     //data giả lập Studio
-    public  static numMap = 5; // số lượng map cần ren
+    public  static numMap = 3; // số lượng map cần ren
     public  static isCountdownMode = false; // Chế độ chơi, có thời gian hoặc không
     public static timeLimit: number = 180; // Thời gian chơi
-    public static bonusScore: number = 500; // Điểm cộng thêm khi tìm được từ
+    public static bonusScore: number = 10; // Điểm cộng thêm khi tìm được từ
 
+    public static dataFake = {
+        topic: "Animals",
+        subTopics: ["Wild Animals", "Domestic Animals"],
+        description: "Find and connect words related to animals in the word grid.",
+        config: {
+            passing_score: 70,
+            mastery_threshold: 90
+        }
+    };
 
     public static Level = [`A1`, `A2`, `B1`, `B2`, `C1`, `C2`];
 

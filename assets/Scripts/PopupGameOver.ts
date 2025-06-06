@@ -1,11 +1,18 @@
-import { _decorator, Component, instantiate, Label, Node, Prefab, Sprite, SpriteFrame, tween, UITransform } from 'cc';
+import { _decorator, Color, Component, instantiate, Label, Node, Prefab, SkeletalAnimation, Skeleton, sp, Sprite, SpriteFrame, tween, UITransform } from 'cc';
 import { WordSearch } from './WordSearch';
 import { NumberScrolling } from './NumberScrolling';
 import { GameManager } from './GameManager';
+import { ItemReportProgress } from './ItemReportProgress';
 const { ccclass, property } = _decorator;
 
 @ccclass('PopupGameOver')
 export class PopupGameOver extends Component {
+
+    @property({ type: Node, tooltip: "Node chứa kết quả game" })
+    private resultNode: Node = null;
+
+    @property({ type: Node, tooltip: "Node chứa các điểm skill" })
+    private skillNode: Node = null;
 
     @property({ type: NumberScrolling, tooltip: "Component số chạy cho điểm trong popup game over" })
     private scoreScrolling: NumberScrolling = null;
@@ -22,10 +29,16 @@ export class PopupGameOver extends Component {
     @property({ type: Prefab, tooltip: "Page sinh ra" })
     private pagePrefab: Prefab = null;
 
-    @property({ type: SpriteFrame, tooltip: "Ảnh đúng" })
-    private spriteCorrect: SpriteFrame = null;
-    @property({ type: SpriteFrame, tooltip: "Ảnh sai" })
-    private spriteWrong: SpriteFrame = null;
+    // @property({ type: SpriteFrame, tooltip: "nền cho câu đúng" })
+    // private spriteCorrect: SpriteFrame = null;
+    // @property({ type: SpriteFrame, tooltip: "nền cho câu sai" })
+    // private spriteWrong: SpriteFrame = null;
+
+    @property({ type: SpriteFrame, tooltip: "ký hiệu câu đúng" })
+    private iconCorrect: SpriteFrame = null;
+    @property({ type: SpriteFrame, tooltip: "ký hiệu câu sai" })
+    private iconWrong: SpriteFrame = null;
+
 
     protected onDisable(): void {
         this.scoreScrolling.setValue(0);
@@ -44,6 +57,7 @@ export class PopupGameOver extends Component {
                 this.scoreScrolling.to(score);
             }, 1.5);
         }
+        this.calculateAchievement(score);
 
         // Cập nhật thời gian
         this.timeLabelOver.node.parent.active = totalTime !== 0;
@@ -54,6 +68,7 @@ export class PopupGameOver extends Component {
         }
 
         // Cập nhật kỹ năng (chưa có code)
+        this.calculateSkillScores();
 
         // Cập nhật đáp án
         console.log(maps);
@@ -70,6 +85,75 @@ export class PopupGameOver extends Component {
         this.renderReport(maps);
     }
 
+    /**
+     * Tính toán và trả về mốc điểm người chơi đạt được
+     */
+    private calculateAchievement(currentScore: number) {
+        const maxValue = Number((GameManager.numMap * GameManager.bonusScore * 5).toFixed(2));
+        const percentage = (currentScore / maxValue) * 100;
+
+        const emoji = this.resultNode.getChildByPath(`emoj`).getComponent(sp.Skeleton);
+        const missingPoint = this.resultNode.getChildByPath(`missingPoint`);
+        const confenti = this.resultNode.getChildByPath(`confenti`);
+        const labelScore = this.resultNode.getChildByPath(`Score/LabelScore`).getComponent(Label);
+
+        if (percentage == 100) {
+            emoji.setAnimation(0, `WOW`);
+            missingPoint.active = false;
+            confenti.active = true;
+            labelScore.string = `LEGENDARY`;
+            this.resultNode.getComponent(Sprite).color = new Color().fromHEX(`#CECE3C`);
+        } else if (percentage >= 70) {
+            emoji.setAnimation(0, `FUNNY`);
+            missingPoint.active = true;
+            missingPoint.getChildByPath(`LabelScoreMiss`).getComponent(Label).string = `+${(maxValue - currentScore).toFixed(2)}`;
+            missingPoint.getChildByPath(`LabelMiss`).getComponent(Label).string = `TO LEGENDARY`;
+            confenti.active = true;
+            labelScore.string = `COMPLETED`;
+            this.resultNode.getComponent(Sprite).color = new Color().fromHEX(`#4BB7DA`);
+        } else {
+            emoji.setAnimation(0, `SAD`);
+            missingPoint.active = true;
+            missingPoint.getChildByPath(`LabelScoreMiss`).getComponent(Label).string = `+${(maxValue * 0.7 - currentScore).toFixed(2)}`;
+            missingPoint.getChildByPath(`LabelMiss`).getComponent(Label).string = `TO COMPLETED`;
+            confenti.active = false;
+            labelScore.string = `KEEP GOING`;
+            this.resultNode.getComponent(Sprite).color = new Color().fromHEX(`#9B9B9B`);
+        }
+    }
+
+    /**
+     * Tính toán và cập nhật điểm số cho từng kỹ năng dựa trên kết quả chơi
+     */
+    private calculateSkillScores() {
+        const maxValue = Number((GameManager.numMap * GameManager.bonusScore * 5).toFixed(2));
+        let point = maxValue;
+        [
+            { key: "listening", persent: 10 },
+            { key: "reading", persent: 30 },
+            { key: "writing", persent: 0 },
+            { key: "speaking", persent: 0 },
+            { key: "grammar", persent: 0 },
+            { key: "vocabulary", persent: 60 },
+        ].forEach(e => {
+            let progress = this.skillNode.getChildByName(e.key).getComponent(ItemReportProgress);
+            let scoreValue = Number((e.persent * maxValue / 100).toFixed(2));
+            if (e.key == "vocabulary") {
+                scoreValue = Number(point.toFixed(2));
+            } else {
+                point -= scoreValue;
+            }
+
+            progress.node.active = e.persent > 0;
+            progress.setValue(scoreValue, maxValue);
+        });
+    }
+
+
+    /**
+     * Hiển thị báo cáo kết quả của người chơi
+     * @param maps Mảng chứa dữ liệu các trang game
+     */
     public renderReport(maps: any[]) {
         this.viewReport.removeAllChildren();
 
@@ -80,6 +164,7 @@ export class PopupGameOver extends Component {
 
             const itemRoot = pageNode.children[1];
 
+            let isSwapColer = false;
             mapData.wordAnswers.forEach((word: string, i: number) => {
                 const isDiscovered = mapData.discoveredWords[i];
 
@@ -90,14 +175,26 @@ export class PopupGameOver extends Component {
                 const label = itemNode.getChildByName("Label")?.getComponent(Label);
                 if (label) label.string = word;
 
+                // const bg = itemNode.getChildByName("BG")?.getComponent(Sprite);
+                // if (bg) bg.spriteFrame = isDiscovered ? this.spriteCorrect : this.spriteWrong;
+
                 const bg = itemNode.getChildByName("BG")?.getComponent(Sprite);
-                if (bg) bg.spriteFrame = isDiscovered ? this.spriteCorrect : this.spriteWrong;
+                const icon = itemNode.getChildByName("icon")?.getComponent(Sprite);
+                if (icon) icon.spriteFrame = isDiscovered ? this.iconCorrect : this.iconWrong;
+                if (bg) bg.color = isDiscovered ? (isSwapColer ? new Color().fromHEX("#83c6ff") : new Color().fromHEX("#6185ed")) : (isSwapColer ? new Color().fromHEX("#ff8383") : new Color().fromHEX("#fc6161"));
+                isSwapColer = !isSwapColer;
             });
 
         })
     }
 
-    public showReport() {
+    //==================== Xử lý các button ====================//
+    /**
+     * Hiển thị báo cáo kết quả của người chơi
+     * @param e Sự kiện click
+     * @param str Chuỗi tham số
+     */
+    public showReport(e, str) {
         const UITr = this.viewReport.parent.getComponent(UITransform);
         const heghtNew = UITr.height == 0 ? this.viewReport.getComponent(UITransform).height : 0;
 
@@ -109,31 +206,6 @@ export class PopupGameOver extends Component {
         } else {
             UITr.height = 0;
         }
-    }
-    
-
-    check() {
-        // const maxValue = Number(Play.instance.point.toFixed(2));
-        // let point = maxValue;
-        // [
-        //     { key: "listening", persent: Play.data.config.listening_skill_percent },
-        //     { key: "reading", persent: Play.data.config.reading_skill_percent },
-        //     { key: "writing", persent: Play.data.config.writing_skill_percent },
-        //     { key: "speaking", persent: Play.data.config.speaking_skill_percent },
-        //     { key: "grammar", persent: Play.data.config.grammar_skill_percent },
-        //     { key: "vocabulary", persent: Play.data.config.vocabulary_skill_percent },
-        // ].forEach(e => {
-        //     let progress = this.node.getChildByName(e.key).getComponent(ItemReportProgress);
-        //     let scoreValue = Number((e.persent * maxValue / 100).toFixed(2));
-        //     if (e.key == "vocabulary") {
-        //         scoreValue = Number(point.toFixed(2));
-        //     } else {
-        //         point -= scoreValue;
-        //     }
-
-        //     progress.setValue(scoreValue, maxValue);
-        //     progress.node.active = e.persent > 0;
-        // });
     }
 }
 
