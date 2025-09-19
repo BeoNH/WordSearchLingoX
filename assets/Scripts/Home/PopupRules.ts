@@ -20,13 +20,13 @@ export class PopupRules extends Component {
     lbLegendrary: Label = null;
 
     onLoad() {
-        this.lbTopic.string = GameManager.dataFake.topic ?? "";
-        this.lbSubTopic1.string = GameManager.dataFake.subTopics[0] ?? "";
-        this.lbSubTopic2.string = GameManager.dataFake.subTopics[1] ?? "";
-        this.txtDesc.string = `<b>Description:<b> \n${GameManager.dataFake.description ?? ""}`;
+        this.lbTopic.string = GameManager.data.topic ?? "";
+        this.lbSubTopic1.string = GameManager.data.subTopics[0] ?? "";
+        this.lbSubTopic2.string = GameManager.data.subTopics[1] ?? "";
+        this.txtDesc.string = `<b>Description:<b> \n${GameManager.data.description ?? ""}`;
 
-        this.lbCompleted.string = `${GameManager.dataFake.config.passing_score}`;
-        this.lbLegendrary.string = `${GameManager.dataFake.config.mastery_threshold}`;
+        this.lbCompleted.string = `${GameManager.data.config.passing_score}`;
+        this.lbLegendrary.string = `${GameManager.data.config.mastery_threshold}`;
     }
 }
 

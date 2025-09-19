@@ -1,5 +1,42 @@
-import { _decorator, AudioSource, Component, Node } from 'cc';
+import { _decorator, AudioClip, AudioSource, Component, game, Node, resources } from 'cc';
 const { ccclass, property } = _decorator;
+
+resources.load<AudioClip>("Sounds/silent", (err, data) => {
+    if (data) {
+        console.warn(`[AudioManager] ⚠️ silent loaded`);
+        const cb = (event) => {
+            //Audio chạy ngầm
+            console.log("👆 Đã chạm vào màn hình!", event);
+            game.canvas.removeEventListener('touchend', cb);
+            game.canvas.removeEventListener('mouseup', cb);
+
+            const audio = new Audio(data.nativeUrl);
+            audio.loop = true;
+            audio.volume = 1;
+            audio.play().then(() => {
+                console.warn(`[AudioManager] ⚠️ play silent`);
+            }).catch(err => {
+                console.warn(`[AudioManager] ⚠️ play silent failed: ${err}`);
+            });
+
+            // Bắt test read của GG
+            const text = "";
+            const voices = window.speechSynthesis.getVoices();
+            const speech = new SpeechSynthesisUtterance(text);
+            speech.voice = voices.find(voice => voice.lang.includes("en-US")) || voices.find(voice => voice.lang.includes("en")) || voices[0];
+            speech.lang = "en-US";
+            // speech.volume = 1;
+            speech.rate = 0.8; // Tốc độ đọc (1 là bình thường)
+            // speech.pitch = 1; // Cao độ giọng đọc (1 là mặc 
+        
+            window.speechSynthesis.cancel();
+            window.speechSynthesis.speak(speech);
+        };
+        game.canvas.addEventListener('touchend', cb, { once: true, passive: true });
+        game.canvas.addEventListener('mouseup', cb, { once: true, passive: true });
+    }
+});
+
 
 @ccclass('AudioController')
 export class AudioController extends Component {
@@ -10,7 +47,7 @@ export class AudioController extends Component {
     @property({ type: Node, tooltip: "iconInGame" })
     private iconGame: Node = null;
 
-    volume = 1;
+    volume = 0;
 
     protected onLoad(): void {
         AudioController.Instance = this;

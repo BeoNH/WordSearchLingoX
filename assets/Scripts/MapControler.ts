@@ -1,8 +1,8 @@
-import { _decorator, Color, Component, EventTouch, Input, input, instantiate, Label, Node, Prefab, Sprite, UITransform, Vec3, Graphics, tween, v3, assetManager, ImageAsset, SpriteFrame, Texture2D, Button, ScrollView, Vec2 } from 'cc';
+import { _decorator, Color, Component, EventTouch, Input, input, instantiate, Label, Node, Prefab, Sprite, UITransform, Vec3, Graphics, tween, v3, assetManager, ImageAsset, SpriteFrame, Texture2D, Button, ScrollView, Vec2, AudioClip, AudioSource, game, VideoPlayer, VideoClip } from 'cc';
 import { GameManager } from './GameManager';
 import { WordSearch } from './WordSearch';
-import { UIControler } from './UIControler';
 import { AudioController } from './AudioController';
+import { ImgResize } from './ImgResize';
 const { ccclass, property } = _decorator;
 
 
@@ -40,11 +40,16 @@ export class MapControler extends Component {
     public lbCorrectAnswer: Label = null;
     @property({ type: Sprite, tooltip: "Ảnh đáp án được phóng to" })
     public imgZoomScale: Sprite = null;
+    @property({ type: VideoPlayer, tooltip: "Video đáp án được phóng to" })
+    public vidZoomScale: VideoPlayer = null;
+    @property({ type: Node, tooltip: "Âm thanh đáp án được phóng to" })
+    public audioZoomScale: Node = null;
     // @property({ type: Node, tooltip: "Node chứa các gợi ý từ khoá" })
     // public itemShowKeyList: Node = null;
 
 
     // Game State
+    private indexMap: number = null;
     private grid: GridCell[][] = [];
     private selectedCells: GridCell[] = [];
     private usedFeatures: UsedFeatures = {
@@ -66,22 +71,22 @@ export class MapControler extends Component {
 
 
 
-    initMap() {
-        GameManager.getRandomWordSet();
-        GameManager.generateMatrix();
+
+    initMap(indexMap: number) {
+        this.indexMap = indexMap;
+        // GameManager.getRandomWordSet(indexMap);
 
         this.resetGameState();
         this.initializeData();
         this.setupUI();
     }
 
-    protected onEnable(): void {
-        console.log("onEnable", this.node.active);
+    protected convertText(): void {
         this.registerEvents();
+        // this.onReadWord("")
     }
 
     protected onDisable(): void {
-        console.log("onDisable", this.node.active);
         this.unregisterEvents();
     }
 
@@ -95,7 +100,7 @@ export class MapControler extends Component {
      * - Reset giao diện
      */
     private resetGameState() {
-        this.unregisterEvents();
+        // this.unregisterEvents();
 
         // Reset các biến trạng thái
         this.grid = [];
@@ -110,7 +115,10 @@ export class MapControler extends Component {
         this.activeSelectionLine = null;
         this._eventListenersInitialized = false;
         this.imgZoomScale.node.parent.active = false;
+        this.vidZoomScale.node.parent.active = false;
+        this.audioZoomScale.parent.active = false;
         WordSearch.Instance.waitMask.active = false;
+        WordSearch.Instance.blockMask.active = false;
 
         this.usedFeatures = {
             hints: new Set<number>(),
@@ -131,7 +139,7 @@ export class MapControler extends Component {
      * Khởi tạo dữ liệu game từ GameManager
      */
     private initializeData() {
-        this.wordAnswers = [...GameManager.data.answers];
+        this.wordAnswers = [...GameManager.data.questions[this.indexMap].answers.map(word => word.value.replace(/\s+/g, '').toUpperCase())];
         this.discoveredWords = new Array(this.wordAnswers.length).fill(false);
     }
 
@@ -178,7 +186,11 @@ export class MapControler extends Component {
      * - Thiết lập vị trí và style cho từng ô
      */
     private initializeWordGrid() {
-        this.grid = GameManager.data.matrixKey.map(row => row.map(letter => ({
+        // GameManager.data.questions[this.indexMap].matrixKey = []
+        // GameManager.data.questions[this.indexMap].matrixKey = GameManager.generateMatrix(this.wordAnswers)
+        // console.log(JSON.stringify(GameManager.data));
+        // this.grid = GameManager.generateMatrix(this.wordAnswers).map(row => row.map(letter => ({
+        this.grid = GameManager.data.questions[this.indexMap].matrixKey.map(row => row.map(letter => ({
             node: instantiate(this.letterCell),
             letter: letter
         })));
@@ -226,6 +238,7 @@ export class MapControler extends Component {
     private initializeAnswerDisplay() {
         const remCount = this.wordAnswers.length;
         const pool = this.answerList.children;
+
         for (let i = 0; i < remCount; i++) {
             let item: Node;
             if (i < pool.length) {
@@ -234,23 +247,85 @@ export class MapControler extends Component {
                 item = instantiate(this.answerCell);
                 item.parent = this.answerList;
             }
-            let label = item.getChildByPath(`Label`).getComponent(Label);
-            label.string = this.convertToUnderscore(this.wordAnswers[i]);
-            label.color = new Color(80, 124, 181);
+
+            const answer = GameManager.data.questions[this.indexMap].answers[i];
+
+            let label = item.getChildByPath(`Label`);
+            label.active = !answer.isHide;
+            label.getComponent(Label).string = this.convertToUnderscore(this.wordAnswers[i]);
+            label.getComponent(Label).color = new Color(80, 124, 181);
+
+            item["isHide"] = answer.isHide;
             item.active = true;
 
             let img = pool[i].getChildByPath(`Media/Img`);
+            let vid = pool[i].getChildByPath(`Media/Video`);
+            let audio = pool[i].getChildByPath(`Media/Audio`);
             let sound = pool[i].getChildByPath(`Media/btnSound`);
-            if (i == 0) {
-                this.loadSpriteFrameFromUrl(`https://fastly.picsum.photos/id/177/2515/1830.jpg?hmac=G8-2Q3-YPB2TreOK-4ofcmS-z5F6chIA0GHYAe5yzDY`, sf => {
-                    img.getComponent(Sprite).spriteFrame = sf;
-                })
-                img.off("click");
-                img.on("click", () => this.zoomScaleImage(null, i));
-            } else {
-                img.active = false;
-                sound.off("click");
-                sound.on("click", () => this.onReadLetter(null, i));
+            let hint = pool[i].getChildByPath(`Media/Hint`);
+
+            // Reset trạng thái
+            img && (img.active = false);
+            vid && (vid.active = false);
+            audio && (audio.active = false);
+            sound && (sound.active = false);
+            hint && (hint.active = false);
+
+            // answer.image = 'https://cdn.pixabay.com/audio/2025/05/30/audio_d4653c551c.mp3';
+            // answer.image = 'https://cdn.gamebatta.com/testvid-4493/movie.mp4';
+            
+            // window["count"]= window["count"] || 0; 
+            
+            // answer.image = window["count"]++ % 2 == 0 ? 'https://cdn.gamebatta.com/doc-9950/doc.mp4' : "https://cdn.gamebatta.com/testvid-4493/movie.mp4";
+
+            // Gán dữ liệu media nếu có
+            if (answer.image) {
+                assetManager.loadRemote(answer.image, (err, asset) => {
+                    if (asset instanceof ImageAsset) {
+                        console.log("isImage");
+
+                        img && (img.active = true);
+                        const spriteFrame = SpriteFrame.createWithImage(asset);
+                        const sp = img?.getComponent(Sprite);
+                        if (sp) sp.spriteFrame = spriteFrame;
+                        const rs = img?.getComponent(ImgResize);
+                        if(rs) rs.resize();
+
+                        img?.off("click");
+                        img?.on("click", () => this.zoomScaleImage(null, i));
+                    }
+                    else if (asset instanceof AudioClip) {
+                        console.log("isAudio");
+
+                        audio && (audio.active = true);
+
+                        audio?.off("click");
+                        audio?.on("click", () => this.playInPlayMusic(null, asset));
+                    }
+                    else if (asset instanceof VideoClip) {
+                        console.log("isVideo");
+
+                        vid && (vid.active = true);
+
+                        vid?.off("click");
+                        vid?.on("click", () => this.zoomScaleVideo(null, answer.image));
+                    }
+                    else {
+                        console.log("isOther");
+                    }
+                });
+            }
+
+            else if (answer.hint) {
+                hint && (hint.active = true);
+                const hintLabel = hint.getComponent(Label);
+                if (hintLabel) hintLabel.string = answer.hint;
+            }
+
+            else if (!answer.image && !answer.hint) {
+                sound && (sound.active = true);
+                sound?.off("click");
+                sound?.on("click", () => this.onReadLetter(null, i));
             }
         }
 
@@ -455,7 +530,7 @@ export class MapControler extends Component {
                 this.activeSelectionLine.active = true;
                 checkWrong = false;
 
-                this.onReadWord(formattedAnswers[i]);
+                // this.onReadWord(formattedAnswers[i]);
                 if (!this.usedFeatures.sounds.has(i)) {
                     this.usedFeatures.sounds.add(i);
                     console.log(this.usedFeatures.sounds, i);
@@ -463,16 +538,27 @@ export class MapControler extends Component {
 
                 this.discoveredWords[i] = true;
                 AudioController.Instance.Correct();
-                WordSearch.Instance.updateScoreDisplay(GameManager.bonusScore);
+                WordSearch.Instance.updateScoreDisplay(GameManager.data.options.bonusScore);
                 this.updateCorrectAnswer();
 
                 this.scrollAnswerToCenter(i);
-                this.showWordMoveEffect(this.selectedCells, i, () => {
-                    if (this.discoveredWords.every(found => found)) {
-                        AudioController.Instance.Clear();
-                        this.endMap();
-                    }
-                });
+
+                if (this.answerList.children[i]["isHide"]) {
+                    this.answerList.children[i].getChildByPath(`tickDone`).active = true;
+                    this.scheduleOnce(() => {
+                        if (this.discoveredWords.every(found => found)) {
+                            AudioController.Instance.Clear();
+                            this.endMap();
+                        }
+                    }, 1) // tránh lỗi
+                } else {
+                    this.showWordMoveEffect(this.selectedCells, i, () => {
+                        if (this.discoveredWords.every(found => found)) {
+                            AudioController.Instance.Clear();
+                            this.endMap();
+                        }
+                    });
+                }
 
                 break;
             }
@@ -520,7 +606,7 @@ export class MapControler extends Component {
         }
 
         const answer = this.wordAnswers[answerIndex];
-        this.onReadWord(answer);
+        // this.onReadWord(answer);
     }
 
     /**
@@ -529,15 +615,19 @@ export class MapControler extends Component {
     onReadWord(txt: string) {
         if (window.speechSynthesis) {
             const voices = window.speechSynthesis.getVoices();
-            const msg = new SpeechSynthesisUtterance(txt);
-            msg.voice = voices.find(voice => voice.lang.includes("en-US")) || voices.find(voice => voice.lang.includes("en")) || voices[0];
-            msg.lang = 'en-US';
-            msg.volume = 1;
-            msg.rate = 0.8;
-            window.speechSynthesis.speak(msg);
+            const speech = new SpeechSynthesisUtterance(txt);
+            speech.voice = voices.find(voice => voice.lang.includes("en-US")) || voices.find(voice => voice.lang.includes("en")) || voices[0];
+            speech.lang = "en-US";
+            // speech.volume = 1;
+            speech.rate = 0.8; // Tốc độ đọc (1 là bình thường)
+            // speech.pitch = 1; // Cao độ giọng đọc (1 là mặc 
+
+            window.speechSynthesis.cancel();
+            window.speechSynthesis.speak(speech);
         } else {
             console.error("SpeechSynthesis không được hỗ trợ trên nền tảng này!");
         }
+
     }
 
     /**
@@ -548,6 +638,7 @@ export class MapControler extends Component {
         if (indx === undefined || indx === null) {
             if (this.imgZoomScale.node.parent) {
                 this.imgZoomScale.node.parent.active = false;
+                WordSearch.Instance.blockMask.active = false;
             }
             return;
         }
@@ -559,8 +650,10 @@ export class MapControler extends Component {
 
         // Lấy spriteFrame từ answerList
         this.imgZoomScale.spriteFrame = this.answerList.children[indx].getChildByPath(`Media/Img`).getComponent(Sprite).spriteFrame;
+        this.imgZoomScale?.getComponent(ImgResize).resize();
 
         // Hiệu ứng scale
+        WordSearch.Instance.blockMask.active = true;
         this.imgZoomScale.node.scale = v3(0, 0, 0);
         tween(this.imgZoomScale.node)
             .to(0.3, { scale: v3(1, 1, 1) }, { easing: 'backOut' })
@@ -573,6 +666,107 @@ export class MapControler extends Component {
                     .start();
             })
             .start();
+    }
+
+    /**
+     * Phóng to Video ra
+     */
+    zoomScaleVideo(e: EventTouch, urlVid: string) {
+        // Nếu index không hợp lệ thì ẩn popup và return luôn
+        if (urlVid === undefined || urlVid === null) {
+            if (this.vidZoomScale.node.parent) {
+                this.vidZoomScale.node.parent.active = false;
+                this.vidZoomScale.keepAspectRatio = true;
+                WordSearch.Instance.blockMask.active = false;
+            }
+            return;
+        }
+
+        // Hiện popup
+        if (this.vidZoomScale.node.parent) {
+            this.vidZoomScale.node.parent.active = true;
+        }
+
+        // Lấy spriteFrame từ answerList
+        this.vidZoomScale.remoteURL = "";
+        this.vidZoomScale.remoteURL = urlVid;
+        this.vidZoomScale.node.once(VideoPlayer.EventType.READY_TO_PLAY, () => {
+            // Tinh toán size
+            const tf = this.vidZoomScale.getComponent(UITransform);
+            this.vidZoomScale.keepAspectRatio = false;
+            const ratio = tf.width / tf.height;
+            if (tf.width > tf.height) {
+                tf.width = 900;
+                tf.height = 900 / ratio;
+            } else {
+                tf.width = 900 * ratio;
+                tf.height = 900
+            }
+
+        });
+        this.vidZoomScale.play();
+
+        // Hiệu ứng scale
+        WordSearch.Instance.blockMask.active = true;
+        this.vidZoomScale.node.scale = v3(0, 0, 0);
+        tween(this.vidZoomScale.node)
+            .to(0.3, { scale: v3(1, 1, 1) }, { easing: 'backOut' })
+            .call(() => {
+                tween(this.vidZoomScale.node)
+                    .to(0.08, { scale: v3(0.83, 0.83, 1) })
+                    .to(0.08, { scale: v3(1, 1, 1) })
+                    .to(0.08, { scale: v3(0.93, 0.93, 1) })
+                    .to(0.08, { scale: v3(1, 1, 1) })
+                    .start();
+            })
+            .start();
+    }
+
+    /**
+     * Tạo 1 audio mới và chạy âm thanh
+     */
+    playInPlayMusic(e: EventTouch, asset) {
+        let audioSource = this.node.getChildByPath(`audioHint`).getComponent(AudioSource);
+        audioSource.stop();
+
+        if (!asset) {
+            console.error("Không có asset âm thanh để phát!");
+            if (this.audioZoomScale.parent) {
+                this.audioZoomScale.parent.active = false;
+                WordSearch.Instance.blockMask.active = false;
+            }
+            return;
+        }
+
+        // Hiện popup
+        // if (this.audioZoomScale.parent) {
+        //     this.audioZoomScale.parent.active = true;
+        // }
+
+        // Chạy âm thanh tải về
+        audioSource.clip = asset;
+        audioSource.play();
+
+        // Xóa node sau khi phát xong
+        audioSource.node.once(AudioSource.EventType.ENDED, () => {
+            audioSource.clip = null;
+        });
+
+
+        // Hiệu ứng scale
+        // WordSearch.Instance.blockMask.active = true;
+        // this.audioZoomScale.scale = v3(0, 0, 0);
+        // tween(this.audioZoomScale)
+        //     .to(0.3, { scale: v3(1, 1, 1) }, { easing: 'backOut' })
+        //     .call(() => {
+        //         tween(this.audioZoomScale)
+        //             .to(0.08, { scale: v3(0.83, 0.83, 1) })
+        //             .to(0.08, { scale: v3(1, 1, 1) })
+        //             .to(0.08, { scale: v3(0.93, 0.93, 1) })
+        //             .to(0.08, { scale: v3(1, 1, 1) })
+        //             .start();
+        //     })
+        //     .start();
     }
 
 
@@ -612,7 +806,7 @@ export class MapControler extends Component {
                 const letterLabel = letterNode.addComponent(Label);
                 letterLabel.color = new Color(80, 124, 181);
                 letterLabel.string = cell.letter;
-                letterLabel.fontSize = 60;
+                letterLabel.fontSize = 40;
                 letterLabel.lineHeight = 80;
                 letterLabel.isBold = true;
                 letterLabel.enableOutline = true;
@@ -620,7 +814,7 @@ export class MapControler extends Component {
                 letterLabel.enableShadow = true;
                 letterLabel.shadowColor = new Color(56, 56, 56);
 
-                const targetX = targetPos.x + (index - selectedCells.length / 2) * 45;
+                const targetX = targetPos.x + (index - selectedCells.length / 2) * 30;
                 const targetY = targetPos.y;
 
                 tween(letterNode)
@@ -634,7 +828,7 @@ export class MapControler extends Component {
                     })
                     .call(() => {
                         if (index === selectedCells.length - 1) {
-                            answerLabel.string = this.wordAnswers[answerIndex];
+                            answerLabel.string = this.wordAnswers[answerIndex].toUpperCase();
                             this.node.children.forEach(child => {
                                 if (child.name === "MovingLetter") {
                                     child.destroy();
@@ -666,7 +860,7 @@ export class MapControler extends Component {
 
         let offset = viewWidth / 2 + itemWidthIdx;
         offset = Math.max(0, Math.min(offset, contentWidth - viewWidth / 2));
-        console.log(viewWidth / 2, itemWidthIdx, offset);
+        // console.log(viewWidth / 2, itemWidthIdx, offset);
 
         const content = this.answerScrollView.getComponent(ScrollView).content;
         tween(content)
@@ -755,26 +949,8 @@ export class MapControler extends Component {
     }
 
 
-    /**
-     * Tải SpriteFrame từ URL
-     * @param url Đường dẫn URL của ảnh
-     * @param cb Callback trả về SpriteFrame sau khi tải xong
-     */
-    private loadSpriteFrameFromUrl(url: string, cb: (sf: SpriteFrame) => void) {
-        assetManager.loadRemote<ImageAsset>(url, { ext: ".png" }, (err, data) => {
-            if (err || !data) {
-                cb(null);
-                return;
-            }
-
-            const texture = new Texture2D();
-            texture.image = data;
-
-            const sf = new SpriteFrame();
-            sf.texture = texture;
-
-            cb(sf);
-        });
+    test() {
+        this.onReadWord("Lion")
     }
 }
 

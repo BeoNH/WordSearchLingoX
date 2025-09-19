@@ -1,4 +1,4 @@
-import { _decorator, Component, Node } from 'cc';
+import { _decorator, assetManager, Component, ImageAsset, Node, SpriteFrame, Texture2D } from 'cc';
 import { DEBUG } from 'cc/env';
 import { UIControler } from './UIControler';
 import { GameManager } from './GameManager';
@@ -18,15 +18,12 @@ const { ccclass, property } = _decorator;
 export class GameControler extends Component {
     public static Instance: GameControler;
 
+    @property({ type: Node, tooltip: "scene Load tài nguyên" })
+    private sceneLoadAsset: Node = null;
     @property({ type: Node, tooltip: "scene gamePlay" })
     private scenePlay: Node = null;
     @property({ type: Node, tooltip: "scene menu" })
     private sceneMenu: Node = null;
-
-    // @property({ type: Label, tooltip: "hiển thị số lượt chơi" })
-    // private labelTurn: Label = null;
-
-    private numTurn: number = 0; // số lượt chơi
 
     onLoad() {
         GameControler.Instance = this;
@@ -34,9 +31,33 @@ export class GameControler extends Component {
 
         this.sceneMenu.active = true;
         this.scenePlay.active = false;
+        this.sceneLoadAsset.active = true;
 
-        // this.loginBatta();
+        let data = {
+            "game_id": APIManager.GID,
+            "publish": APIManager.urlParam(`publish`)
+        }
+
+        // APIManager.requestData('GET', `/home-game-studio/client-game-studio-puzzle/${APIManager.urlParam(`gid`)}/?publish=${APIManager.urlParam(`publish`)}`, null, res => {
+        APIManager.requestData('POST', `/webhook/game/lingox-getConfig/`, data, res => {
+            if (!res) {
+                UIControler.instance.onMess(`Loading game data failed \n. . .\n ${res?.message}`);
+                return;
+            }
+
+            // GameManager.data = { ...GameManager.data, ...res.data };
+            GameManager.data = { ...GameManager.data, ...res };
+
+            MenuControler.Instance.loadTopics(() => {
+                this.sceneLoadAsset.active = false;
+            })
+        });
     }
+    // protected start(): void {
+    //     MenuControler.Instance.loadTopics(() => {
+    //         this.sceneLoadAsset.active = false;
+    //     })
+    // }
 
     onDestroy() {
         window.removeEventListener("beforeunload", this.onBeforeUnload);
@@ -56,67 +77,54 @@ export class GameControler extends Component {
 
     async openGame() {
         AudioController.Instance.A_Click();
-        this.sceneMenu.active = false;
-        this.scenePlay.active = true;
-        WordSearch.Instance.initGame();
+        let data = {
+            "game_id": APIManager.GID,
+            "publish": APIManager.urlParam(`publish`)
+        }
 
-        // if (this.numTurn <= 0) {
-        //     UIControler.instance.onMess(`No turns remaining. \nPlease purchase extra turns to proceed.`);
-        //     return;
-        // }
-
-        // const toppic = GameManager.Toppic[MenuControler.Instance.numToppic];
-
-        // const url = `/imageToWord/getQuestion`;
-        // const data = {
-        //     "type": toppic,
-        // };
-        // APIManager.requestData(`POST`, url, data, res => {
-        //     if (!res) {
-        //         UIControler.instance.onMess(`Error: ${url} => ${res}`);
-        //         return;
-        //     }
-
-        //     this.sceneMenu.active = false;
-        //     this.scenePlay.active = true;
-        //     Game_Vocabulary.Instance.initGame(toppic, res.data);
-        // });
-    }
-
-    // Đăng nhập Batta lấy thông tin
-    private loginBatta() {
-        const url = `/word-search/login`;
-        const data = {
-            "token": APIManager.urlParam(`token`),
-        };
-        APIManager.requestData(url, data, res => {
-            console.log("Login_info: ", res)
+        // APIManager.requestData('GET', `/home-game-studio/client-game-studio-puzzle/${APIManager.urlParam(`gid`)}/?publish=${APIManager.urlParam(`publish`)}`, null, res => {
+        APIManager.requestData('POST', `/webhook/game/lingox-getQuestions`, data, res => {
             if (!res) {
-                UIControler.instance.onMess(`Error: ${url} => ${res}`);
+                UIControler.instance.onMess(`Loading game data failed \n. . .\n ${res?.message}`);
                 return;
             }
-            APIManager.userDATA = res;
-            // this.remainTurn();
+
+            GameManager.data.questions = res.data.data;
+
+            this.sceneMenu.active = false;
+            this.scenePlay.active = true;
+            WordSearch.Instance.initGame();
+
+            console.log(GameManager.data)
         });
+
+        // this.sceneMenu.active = false;
+        // this.scenePlay.active = true;
+        // WordSearch.Instance.initGame();
     }
 
-    // // Cập nhật thông tin số lượt
-    // private remainTurn(callback?: (remainTurn: number) => void): void {
-    //     const url = `/imageToWord/getTurn`;
-    //     const data = {
-    //         "username": APIManager.userDATA?.username,
-    //     };
-    //     APIManager.requestData(`POST`, url, data, res => {
-    //         if (!res) {
-    //             UIControler.instance.onMess(`Error: ${url} => ${res}`);
-    //             return;
-    //         }
-    //         this.numTurn = res.remain_turn;
-    //         if (callback) {
-    //             callback(this.numTurn);
-    //         }
-    //     });
-    // }
+
+    /**
+     * Tải SpriteFrame từ URL
+     * @param url Đường dẫn URL của ảnh
+     * @param cb Callback trả về SpriteFrame sau khi tải xong
+     */
+    public loadSpriteFrameFromUrl(url: string, cb: (sf: SpriteFrame) => void) {
+        assetManager.loadRemote<ImageAsset>(url, { ext: ".png" }, (err, data) => {
+            if (err || !data) {
+                cb(null);
+                return;
+            }
+
+            const texture = new Texture2D();
+            texture.image = data;
+
+            const sf = new SpriteFrame();
+            sf.texture = texture;
+
+            cb(sf);
+        });
+    }
 }
 
 

@@ -37,6 +37,8 @@ export class WordSearch extends Component {
     public wordSearchMapPrefab: Prefab = null;
     @property({ type: Node, tooltip: "Màn chờ lúc chạy hiệu ứng" })
     public waitMask: Node = null;
+    @property({ type: Node, tooltip: "Màn chờ lúc chạy ảnh và vid" })
+    public blockMask: Node = null;
 
     private mapNodes: Node[] = [];
     private currentMapIndex: number = 0;
@@ -75,12 +77,12 @@ export class WordSearch extends Component {
         this.mapNodes = [];
 
         // Tạo map mới
-        for (let i = 0; i < GameManager.numMap; i++) {
+        for (let i = 0; i < GameManager.data.questions.length; i++) {
             const mapNode = instantiate(this.wordSearchMapPrefab);
             mapNode.parent = this.node;
             mapNode.setSiblingIndex(0);
             const mapComp = mapNode.getComponent(MapControler);
-            mapComp.initMap();
+            mapComp.initMap(i);
 
             mapNode.active = (i === 0);
             this.mapNodes.push(mapNode);
@@ -91,17 +93,17 @@ export class WordSearch extends Component {
         // Khởi tạo số liệu ban đầu
         this.currentScore = 0;
         this.totalTime = 0;
-        this.remainingTime = GameManager.timeLimit;
+        this.remainingTime = GameManager.data.options.timeLimit;
         this.updateScoreDisplay(this.currentScore);
         this.updateTimeDisplay();
 
         // Chế độ chơi
-        if (GameManager.isCountdownMode) {
+        if (GameManager.data.options.isCountdownMode) {
             this.startTotalTimer();
             this.startTimer();
         }
-        this.modeTimeUI.active = GameManager.isCountdownMode;
-        this.modePageUI.active = !GameManager.isCountdownMode;
+        this.modeTimeUI.active = GameManager.data.options.isCountdownMode;
+        this.modePageUI.active = !GameManager.data.options.isCountdownMode;
     }
 
 
@@ -112,7 +114,7 @@ export class WordSearch extends Component {
      * Bắt đầu đếm thời gian Map
      */
     private startTimer() {
-        this.remainingTime = GameManager.timeLimit;
+        this.remainingTime = GameManager.data.options.timeLimit;
         this.timeInterval = setInterval(() => {
             if (this.remainingTime > 0) {
                 this.remainingTime--;
@@ -159,7 +161,7 @@ export class WordSearch extends Component {
 
     public getDataGameOver() {
         return {
-            score: this.currentScore,
+            // score: this.currentScore,
             totalTime: this.totalTime,
             maps: this.mapNodes.map(map => {
                 const mapComp = map.getComponent(MapControler);
@@ -246,35 +248,40 @@ export class WordSearch extends Component {
         if (this.isTransitioning) return;
         const prevIndex = this.currentMapIndex;
         const nextIndex = index;
-        this.numPage.string = `Page: ${nextIndex+1}/${this.mapNodes.length}`;
-        
+        this.numPage.string = `Page: ${nextIndex + 1}/${this.mapNodes.length}`;
+        this.numPage.node.parent.active = this.mapNodes.length > 1;
+
+        if (!GameManager.data.options.isCountdownMode) {
+            const btnDonePage = this.modePageUI.getChildByPath('btnDonePage');
+            const btnNextPage = this.modePageUI.getChildByPath('btnNextPage');
+            const btnPrevPage = this.modePageUI.getChildByPath('btnPrevPage');
+            btnNextPage.active = (this.mapNodes.length > 1);
+            btnPrevPage.active = (this.mapNodes.length > 1);
+
+            if (this.mapNodes.length > 1) {
+                btnDonePage.active = (index === this.mapNodes.length - 1);
+
+                btnNextPage.getComponent(Sprite).grayscale = (index === this.mapNodes.length - 1);
+                btnPrevPage.getComponent(Sprite).grayscale = (index === 0);
+
+                if (index > 0 && index < this.mapNodes.length - 1) {
+                    btnNextPage.getComponent(Sprite).grayscale = false;
+                    btnPrevPage.getComponent(Sprite).grayscale = false;
+                }
+            }
+        }
+
         if (prevIndex === nextIndex) return;
-        
+
         this.isTransitioning = true;
         const prevNode = this.mapNodes[prevIndex];
         const nextNode = this.mapNodes[nextIndex];
         const direction = nextIndex > prevIndex ? 'right' : 'left';
-        
+
         this.transitionMap(prevNode, nextNode, direction, () => {
             this.currentMapIndex = nextIndex;
             this.isTransitioning = false;
         });
-
-        if (!GameManager.isCountdownMode) {
-            const btnDonePage = this.modePageUI.getChildByPath('btnDonePage');
-            const btnNextPage = this.modePageUI.getChildByPath('btnNextPage');
-            const btnPrevPage = this.modePageUI.getChildByPath('btnPrevPage');
-
-            btnDonePage.active = (index === this.mapNodes.length - 1);
-
-            btnNextPage.getComponent(Sprite).grayscale = (index === this.mapNodes.length - 1);
-            btnPrevPage.getComponent(Sprite).grayscale = (index === 0);
-
-            if (index > 0 && index < this.mapNodes.length - 1) {
-                btnNextPage.getComponent(Sprite).grayscale = false;
-                btnPrevPage.getComponent(Sprite).grayscale = false;
-            }
-        }
     }
     public nextMap() {
         if (this.currentMapIndex < this.mapNodes.length - 1) {
@@ -296,7 +303,10 @@ export class WordSearch extends Component {
     /**
      * Kết thúc game
      */
+    private onClick = false;
     public endGame(): void {
+        if (this.onClick) return;
+        this.onClick = true
         if (this.timeInterval) {
             clearInterval(this.timeInterval);
             this.timeInterval = null;
@@ -306,7 +316,7 @@ export class WordSearch extends Component {
 
         if (this.currentMapIndex < this.mapNodes.length - 1) {
             this.showMap(this.currentMapIndex + 1);
-            if (GameManager.isCountdownMode) {
+            if (GameManager.data.options.isCountdownMode) {
                 this.startTimer();
             }
             return;
@@ -319,8 +329,9 @@ export class WordSearch extends Component {
         }
 
         this.scheduleOnce(() => {
+            this.onClick = false;
             AudioController.Instance.gameWin();
             UIControler.instance.onOpen(null, 'over');
-        }, 1)
+        }, 0.5)
     }
 }

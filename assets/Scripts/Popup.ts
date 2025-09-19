@@ -7,7 +7,7 @@ export class Popup extends Component {
     @property({type: Node, tooltip: 'Nội dung'})
     private content:Node= null;
 
-    protected onEnable() {
+    protected convertText() {
         this.content.scale = v3(0,0,0)
         tween(this.content)
         .to(0.3, {scale: v3(1,1,1)}, { easing: 'backOut' })

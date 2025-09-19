@@ -3,6 +3,8 @@ import { WordSearch } from './WordSearch';
 import { NumberScrolling } from './NumberScrolling';
 import { GameManager } from './GameManager';
 import { ItemReportProgress } from './ItemReportProgress';
+import { APIManager } from './APIManager';
+import { UIControler } from './UIControler';
 const { ccclass, property } = _decorator;
 
 @ccclass('PopupGameOver')
@@ -49,64 +51,63 @@ export class PopupGameOver extends Component {
      * Hiển thị hiệu ứng game over và tính điểm
      */
     public showGameOver(): void {
-        const { score, totalTime, maps } = WordSearch.Instance.getDataGameOver();
-
-        // Cập nhật điểm
-        if (score > 0) {
-            this.scheduleOnce(() => {
-                this.scoreScrolling.to(score);
-            }, 1.5);
-        }
-        this.calculateAchievement(score);
+        const { totalTime, maps } = WordSearch.Instance.getDataGameOver();
 
         // Cập nhật thời gian
         this.timeLabelOver.node.parent.active = totalTime !== 0;
-        if (GameManager.isCountdownMode) {
+        if (GameManager.data.options.isCountdownMode) {
             const minutes = Math.floor((totalTime % 3600) / 60);
             const seconds = totalTime % 60;
             this.timeLabelOver.string = `${minutes < 10 ? '0' + minutes : minutes}:${seconds < 10 ? '0' + seconds : seconds}`;
         }
 
         // Cập nhật kỹ năng (chưa có code)
-        this.calculateSkillScores();
 
         // Cập nhật đáp án
-        console.log(maps);
-
         let totalCorrect = 0;
         let totalQuestions = 0;
         maps.forEach((mapData) => {
             totalQuestions += mapData.wordAnswers.length;
             totalCorrect += mapData.discoveredWords.filter(Boolean).length;
         });
-
         this.answerLabel.string = `${totalCorrect}/${totalQuestions}`;
 
+        // Cập nhật điểm
+        const score = Number((totalCorrect * 100 / totalQuestions).toFixed(2));
+        this.scheduleOnce(() => {
+            this.scoreScrolling.to(score);
+        }, 1.5);
+
+        this.saveScore(totalCorrect,totalTime,score);
+        this.calculateSkillScores(score);
+        this.calculateAchievement(score, totalQuestions);
         this.renderReport(maps);
     }
 
     /**
      * Tính toán và trả về mốc điểm người chơi đạt được
      */
-    private calculateAchievement(currentScore: number) {
-        const maxValue = Number((GameManager.numMap * GameManager.bonusScore * 5).toFixed(2));
-        const percentage = (currentScore / maxValue) * 100;
+    private calculateAchievement(currentScore: number, totalQuestions: number) {
+        // const maxValue = Number((totalQuestions * GameManager.data.options.bonusScore).toFixed(2));
+        // const percentage = (currentScore / maxValue) * 100;
+        const percentage = GameManager.data.config.passing_score ?? 0;
+        const threshold = GameManager.data.config.mastery_threshold ?? 0;
 
         const emoji = this.resultNode.getChildByPath(`emoj`).getComponent(sp.Skeleton);
         const missingPoint = this.resultNode.getChildByPath(`missingPoint`);
         const confenti = this.resultNode.getChildByPath(`confenti`);
         const labelScore = this.resultNode.getChildByPath(`Score/LabelScore`).getComponent(Label);
 
-        if (percentage == 100) {
+        if (currentScore >= threshold) {
             emoji.setAnimation(0, `WOW`);
             missingPoint.active = false;
             confenti.active = true;
             labelScore.string = `LEGENDARY`;
             this.resultNode.getComponent(Sprite).color = new Color().fromHEX(`#CECE3C`);
-        } else if (percentage >= 70) {
+        } else if (currentScore >= percentage) {
             emoji.setAnimation(0, `FUNNY`);
             missingPoint.active = true;
-            missingPoint.getChildByPath(`LabelScoreMiss`).getComponent(Label).string = `+${(maxValue - currentScore).toFixed(2)}`;
+            missingPoint.getChildByPath(`LabelScoreMiss`).getComponent(Label).string = `+${(threshold - currentScore).toFixed(2)}`;
             missingPoint.getChildByPath(`LabelMiss`).getComponent(Label).string = `TO LEGENDARY`;
             confenti.active = true;
             labelScore.string = `COMPLETED`;
@@ -114,7 +115,7 @@ export class PopupGameOver extends Component {
         } else {
             emoji.setAnimation(0, `SAD`);
             missingPoint.active = true;
-            missingPoint.getChildByPath(`LabelScoreMiss`).getComponent(Label).string = `+${(maxValue * 0.7 - currentScore).toFixed(2)}`;
+            missingPoint.getChildByPath(`LabelScoreMiss`).getComponent(Label).string = `+${(percentage - currentScore).toFixed(2)}`;
             missingPoint.getChildByPath(`LabelMiss`).getComponent(Label).string = `TO COMPLETED`;
             confenti.active = false;
             labelScore.string = `KEEP GOING`;
@@ -125,19 +126,18 @@ export class PopupGameOver extends Component {
     /**
      * Tính toán và cập nhật điểm số cho từng kỹ năng dựa trên kết quả chơi
      */
-    private calculateSkillScores() {
-        const maxValue = Number((GameManager.numMap * GameManager.bonusScore * 5).toFixed(2));
-        let point = maxValue;
+    private calculateSkillScores(score: number) {
+        let point = score;
         [
-            { key: "listening", persent: 10 },
-            { key: "reading", persent: 30 },
-            { key: "writing", persent: 0 },
-            { key: "speaking", persent: 0 },
-            { key: "grammar", persent: 0 },
-            { key: "vocabulary", persent: 60 },
+            { key: "listening", persent: GameManager.data.config.listening_skill_percent },
+            { key: "reading", persent: GameManager.data.config.reading_skill_percent },
+            { key: "writing", persent: GameManager.data.config.writing_skill_percent },
+            { key: "speaking", persent: GameManager.data.config.speaking_skill_percent },
+            { key: "grammar", persent: GameManager.data.config.grammar_skill_percent },
+            { key: "vocabulary", persent: GameManager.data.config.vocabulary_skill_percent },
         ].forEach(e => {
             let progress = this.skillNode.getChildByName(e.key).getComponent(ItemReportProgress);
-            let scoreValue = Number((e.persent * maxValue / 100).toFixed(2));
+            let scoreValue = Number((e.persent * point / 100).toFixed(2));
             if (e.key == "vocabulary") {
                 scoreValue = Number(point.toFixed(2));
             } else {
@@ -145,7 +145,7 @@ export class PopupGameOver extends Component {
             }
 
             progress.node.active = e.persent > 0;
-            progress.setValue(scoreValue, maxValue);
+            progress.setValue(scoreValue, point);
         });
     }
 
@@ -197,6 +197,8 @@ export class PopupGameOver extends Component {
     public showReport(e, str) {
         const UITr = this.viewReport.parent.getComponent(UITransform);
         const heghtNew = UITr.height == 0 ? this.viewReport.getComponent(UITransform).height : 0;
+        const btnV = e.currentTarget.getChildByPath(`V`);
+        btnV.angle = heghtNew !== 0 ? 0 : -90;
 
         if (heghtNew !== 0) {
             tween(UITr)
@@ -206,6 +208,31 @@ export class PopupGameOver extends Component {
         } else {
             UITr.height = 0;
         }
+    }
+    /**
+     * Lưu điểm lên sever
+     */
+    private saveScore(correct, time, score) {
+        let data = {
+            "correct_answer": correct,
+            "time_play": Math.round(time),
+            "score": score,
+            "game_id": APIManager.GID,
+        }
+
+        APIManager.requestData('POST', `/webhook/game/user-game/`, data, res => {
+            if (!res) {
+                UIControler.instance.onMess(`Loading game data failed \n. . .\n ${res?.message}`);
+                return;
+            }
+        });
+    }
+
+    /**
+     * Chuyển tiếp chế độ
+     */
+    public onContinue() {
+        window.parent.postMessage('goToLearnPath', '*');
     }
 }
 
