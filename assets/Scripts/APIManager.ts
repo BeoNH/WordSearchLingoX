@@ -13,7 +13,7 @@ export class APIManager extends Component {
         username?: string;
         [key: string]: any; // Cho phép thêm thuộc tính động nếu cần
     } = {};
-    public static GID = Number(APIManager.urlParam(`gid`));
+    public static GID = Number(APIManager.urlParam(`gid`)) || 0;
 
     public static requestData(method: string, key: string, data: any, callBack: (response: any) => void) {
         const url = this.urlAPI + key;
