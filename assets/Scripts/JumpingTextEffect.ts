@@ -28,14 +28,6 @@ export class JumpingTextEffect extends Component {
         this.play();
     }
 
-    onDisable() {
-        this.stop();
-    }
-
-    onDestroy() {
-        this.stop();
-    }
-
     // Lấy tất cả component Label từ các node con
     private collectLabels() {
         this.labels = [];
@@ -64,6 +56,7 @@ export class JumpingTextEffect extends Component {
         // Tính thời gian tổng của cycle (khi bắt đầu chu kỳ tiếp theo)
         const totalTime = (this.labels.length - 1) * perCharDelay + singleJumpDuration;
 
+        console.log("total", totalTime, this.labels.length)
         // Duyệt qua từng label và chạy tween với delay tăng dần
         this.labels.forEach((label, idx) => {
             const node = label.node;
@@ -94,8 +87,6 @@ export class JumpingTextEffect extends Component {
                 this.playCycle();
             }, nextStart) as unknown as number;
         } else {
-            // một lần duy nhất
-            // đánh dấu finished sau khi toàn bộ animation xong
             const endDelay = Math.max(0, totalTime);
             this.scheduleOnce(() => {
                 this.isPlaying = false;
@@ -110,31 +101,6 @@ export class JumpingTextEffect extends Component {
         if (this.isPlaying) return;
         this.collectLabels();
         this.playCycle();
-    }
-
-    /**
-     * Dừng hiệu ứng ngay lập tức và về vị trí ban đầu
-     */
-    public stop() {
-        // hủy schedule
-        if (this.scheduledNextCycleId !== null) {
-            // Không có id kiểu number trả về từ scheduleOnce, nhưng chúng ta có thể gọi unscheduleAllCallbacks
-            this.unscheduleAllCallbacks();
-            this.scheduledNextCycleId = null;
-        }
-
-        // dừng tất cả tween và reset vị trí về original (nếu muốn giữ nguyên, có thể comment phần này)
-        if (this.labels.length === 0) this.collectLabels();
-        for (const label of this.labels) {
-            tween(label.node).stop();
-            // reset vị trí y về value ban đầu (giả sử bộ nhảy chưa thay đổi vị trí x/z)
-            // Nếu muốn lưu vị trí ban đầu chính xác, bạn có thể lưu array lúc collectLabels
-            // Ở đây gọi setPosition để chắc chắn không bị dừng ở giữa animation
-            const pos = label.node.getPosition();
-            label.node.setPosition(pos.x, Math.round(pos.y), pos.z);
-        }
-
-        this.isPlaying = false;
     }
 
     // Public helper: thay đổi tham số runtime

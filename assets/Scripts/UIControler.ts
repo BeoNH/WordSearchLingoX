@@ -1,6 +1,7 @@
 import { _decorator, Component, Label, Node } from 'cc';
 import { PopupSettingLevel } from './PopupSettingLevel';
 import { PopupGameOver } from './PopupGameOver';
+import { Popup } from './Popup';
 const { ccclass, property } = _decorator;
 
 @ccclass('UIControler')
@@ -36,29 +37,29 @@ export class UIControler extends Component {
 
         switch (str) {
             case `info`:
-                this.popupInfo.active = true;
+                this.popupInfo.getComponent(Popup).onShow();
                 break;
             case `guid`:
-                this.popupGuid.active = true;
+                this.popupGuid.getComponent(Popup).onShow();
                 break;
             // case `rank`:
-            //     this.popupRank.active = true;
+            //     this.popupRank.getComponent(Popup).onShow();
             //     this.popupRank.getComponent(PopupRank).initRankingList();
             //     break;
             // case `history`:
-            //     this.popupHistory.active = true;
+            //     this.popupHistory.getComponent(Popup).onShow();
             //     this.popupHistory.getComponent(PopupHistory).initHistoryList();
             //     break;
             case `Level`:
-                this.popupSettingLevel.active = true;
+                this.popupSettingLevel.getComponent(Popup).onShow();
                 this.popupSettingLevel.getComponent(PopupSettingLevel).initSettingList();
                 break;
             case `over`:
-                this.popupGameOver.active = true;
+                this.popupGameOver.getComponent(Popup).onShow();
                 this.popupGameOver.getComponent(PopupGameOver).showGameOver();
                 break;
             case `out`:
-                this.popupOutGame.active = true;
+                this.popupOutGame.getComponent(Popup).onShow();
                 let scoreLabel = this.popupOutGame.getChildByPath('content/Score/numScore')?.getComponent(Label);
                 if (scoreLabel) {
                     scoreLabel.string = num.toString();

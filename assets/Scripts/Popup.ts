@@ -1,4 +1,4 @@
-import { _decorator, Component, Node, tween, v3 } from 'cc';
+import { _decorator, Component, Node, tween, v3, Vec3 } from 'cc';
 const { ccclass, property } = _decorator;
 
 @ccclass('Popup')
@@ -19,6 +19,14 @@ export class Popup extends Component {
                 .to(0.08, { scale: v3(1,1,1)})
                 .start();
         })
+        .start()
+    }
+
+    public onShow(){
+        this.node.active = true;
+        this.content.scale = Vec3.ONE.clone().multiplyScalar(0.01);
+        tween(this.content)
+        .to(0.3, {scale: v3(1,1,1)}, { easing: 'backOut' })
         .start()
     }
 

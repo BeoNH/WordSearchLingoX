@@ -197,7 +197,7 @@
         "__id__": 13
       }
     ],
-    "_active": false,
+    "_active": true,
     "_components": [
       {
         "__id__": 19
@@ -209,7 +209,7 @@
     "_lpos": {
       "__type__": "cc.Vec3",
       "x": 0,
-      "y": -270,
+      "y": 722.566,
       "z": 0
     },
     "_lrot": {

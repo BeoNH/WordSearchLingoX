@@ -101,8 +101,8 @@ export class MenuControler extends Component {
                     resolve();
                 });
             } else {
-                this.titleNode.getChildByPath(`Label`).active = true;
-                this.titleNode.getChildByPath(`Label`).getComponent(Logo).convertTextLogo(GameManager.data.config.Name);
+                this.titleNode.getChildByPath(`logoText`).active = true;
+                // this.titleNode.getChildByPath(`Label`).getComponent(Logo).convertTextLogo(GameManager.data.config.Name);
                 resolve();
             }
         });

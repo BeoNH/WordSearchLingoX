@@ -37,7 +37,7 @@ export class GameManager extends Component {
             "speaking_skill_percent": 16,
             "vocabulary_skill_percent": 0,
             "writing_skill_percent": 16,
-            "Name": "Search 1"
+            "Name": "SeaS maxWidth /"
         },
         "questions": [
             {
