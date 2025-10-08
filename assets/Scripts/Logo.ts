@@ -113,7 +113,7 @@ export class Logo extends Component {
         }
         this.node.getComponent(Layout).updateLayout();
 
-        this.animate();
+        // this.animate();
 
         console.log("maxWidth", maxWidth);
         // this.node.getComponent(UITransform).width = maxWidth;
