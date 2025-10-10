@@ -5,6 +5,8 @@ import { GameManager } from './GameManager';
 import { ItemReportProgress } from './ItemReportProgress';
 import { APIManager } from './APIManager';
 import { UIControler } from './UIControler';
+import { GameControler } from './GameControler';
+import { Popup } from './Popup';
 const { ccclass, property } = _decorator;
 
 @ccclass('PopupGameOver')
@@ -234,6 +236,15 @@ export class PopupGameOver extends Component {
     public onContinue() {
         window.parent.postMessage('goToLearnPath', '*');
     }
+
+
+    public async onRetry() {
+        await GameControler.Instance.openGame()
+        .then(() => {
+            this.node.getComponent(Popup)?.onClose();
+        });
+    }
+    
 }
 
 

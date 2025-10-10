@@ -21,7 +21,8 @@
         "progress": 1,
         "state": "success",
         "stage": "build",
-        "message": "9-19-2025 11:09:23 build success in 1 min 17 s!",
+        "message": "10-10-2025 17:14:58 build success in 18 s!",
+        "detailMessage": "// ---- build task web-mobile：onBeforeCopyBuildTemplate ----\r",
         "options": {
           "name": "WordSearch",
           "server": "",
@@ -65,9 +66,24 @@
             "macroConfig": {
               "cleanupImageCache": "inherit-project-setting"
             }
+          },
+          "engineModulesConfigKey": "migrationsConfig",
+          "mangleProperties": false,
+          "nativeCodeBundleMode": "both",
+          "inlineEnum": true,
+          "md5CacheOptions": {
+            "excludes": [],
+            "includes": [],
+            "replaceOnly": [],
+            "handleTemplateMd5Link": true
+          },
+          "wasmCompressionMode": false,
+          "binGroupConfig": {
+            "threshold": 16,
+            "enable": false
           }
         },
-        "time": "9-19-2025 11:08:06",
+        "time": "10-10-2025 17:14:40",
         "dirty": false
       }
     }

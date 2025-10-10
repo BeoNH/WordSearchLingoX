@@ -79,6 +79,7 @@ export class MapControler extends Component {
         this.resetGameState();
         this.initializeData();
         this.setupUI();
+        this.registerEvents();
     }
 
     protected convertText(): void {
