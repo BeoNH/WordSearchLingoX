@@ -99,29 +99,33 @@ export class PopupGameOver extends Component {
         const missingPoint = this.resultNode.getChildByPath(`missingPoint`);
         const confenti = this.resultNode.getChildByPath(`confenti`);
         const labelScore = this.resultNode.getChildByPath(`Score/LabelScore`).getComponent(Label);
+        const bgResult = this.resultNode.getChildByPath(`bg`).getComponent(Sprite);
 
         if (currentScore >= threshold) {
+            // AudioController.Instance.gameWin();
             emoji.setAnimation(0, `WOW`);
             missingPoint.active = false;
             confenti.active = true;
             labelScore.string = `LEGENDARY`;
-            this.resultNode.getComponent(Sprite).color = new Color().fromHEX(`#CECE3C`);
+            bgResult.color = new Color().fromHEX(`#FFBA1B`);
         } else if (currentScore >= percentage) {
+            // AudioController.Instance.gameWin();
             emoji.setAnimation(0, `FUNNY`);
             missingPoint.active = true;
             missingPoint.getChildByPath(`LabelScoreMiss`).getComponent(Label).string = `+${(threshold - currentScore).toFixed(2)}`;
             missingPoint.getChildByPath(`LabelMiss`).getComponent(Label).string = `TO LEGENDARY`;
             confenti.active = true;
             labelScore.string = `COMPLETED`;
-            this.resultNode.getComponent(Sprite).color = new Color().fromHEX(`#4BB7DA`);
+            bgResult.color = new Color().fromHEX(`#29A8FF`);
         } else {
+            // AudioController.Instance.gameOver();
             emoji.setAnimation(0, `SAD`);
             missingPoint.active = true;
             missingPoint.getChildByPath(`LabelScoreMiss`).getComponent(Label).string = `+${(percentage - currentScore).toFixed(2)}`;
             missingPoint.getChildByPath(`LabelMiss`).getComponent(Label).string = `TO COMPLETED`;
             confenti.active = false;
             labelScore.string = `KEEP GOING`;
-            this.resultNode.getComponent(Sprite).color = new Color().fromHEX(`#9B9B9B`);
+            bgResult.color = new Color().fromHEX(`#9B9B9B`);
         }
     }
 

@@ -254,7 +254,7 @@ export class MapControler extends Component {
             let label = item.getChildByPath(`Label`);
             label.active = !answer.isHide;
             label.getComponent(Label).string = this.convertToUnderscore(this.wordAnswers[i]);
-            label.getComponent(Label).color = new Color(80, 124, 181);
+            label.getComponent(Label).color = new Color(255, 247, 35);
 
             item["isHide"] = answer.isHide;
             item.active = true;
@@ -805,13 +805,13 @@ export class MapControler extends Component {
                 letterNode.setWorldPosition(cell.node.getWorldPosition());
 
                 const letterLabel = letterNode.addComponent(Label);
-                letterLabel.color = new Color(80, 124, 181);
+                letterLabel.color = new Color(255, 247, 35);
                 letterLabel.string = cell.letter;
                 letterLabel.fontSize = 40;
                 letterLabel.lineHeight = 80;
                 letterLabel.isBold = true;
                 letterLabel.enableOutline = true;
-                letterLabel.outlineColor = new Color(255, 255, 255);
+                letterLabel.outlineColor = new Color(155, 66, 1);
                 letterLabel.enableShadow = true;
                 letterLabel.shadowColor = new Color(56, 56, 56);
 
